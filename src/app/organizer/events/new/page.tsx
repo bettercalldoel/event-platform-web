@@ -7,9 +7,24 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MIN_BYTES = 20 * 1024; // 20KB
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_MB = 5;
+const MIN_W = 800;
+const MIN_H = 450;
+
+async function getImageSize(file: File): Promise<{ w: number; h: number }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Invalid image"));
+      img.src = url;
+    });
+    return { w: img.naturalWidth, h: img.naturalHeight };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export default function OrganizerCreateEventPage() {
   const router = useRouter();
@@ -19,13 +34,12 @@ export default function OrganizerCreateEventPage() {
   const [category, setCategory] = useState("Tech");
   const [location, setLocation] = useState("Jakarta");
   const [description, setDescription] = useState("");
-  const [startAt, setStartAt] = useState(""); // datetime-local
-  const [endAt, setEndAt] = useState(""); // datetime-local
+  const [startAt, setStartAt] = useState("");
+  const [endAt, setEndAt] = useState("");
   const [price, setPrice] = useState<number>(0);
   const [totalSeats, setTotalSeats] = useState<number>(100);
   const [isPublished, setIsPublished] = useState(true);
 
-  // ✅ image
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
 
@@ -37,20 +51,7 @@ export default function OrganizerCreateEventPage() {
     return !!token && user?.role === "ORGANIZER";
   }, [loading, token, user]);
 
-  const validateImage = (f: File) => {
-    if (!ALLOWED_TYPES.includes(f.type)) {
-      return "File harus JPG / PNG / WebP";
-    }
-    if (f.size < MIN_BYTES) {
-      return "Ukuran gambar terlalu kecil (min 20KB)";
-    }
-    if (f.size > MAX_BYTES) {
-      return "Ukuran gambar terlalu besar (max 5MB)";
-    }
-    return null;
-  };
-
-  const validate = () => {
+  const validate = async () => {
     if (!name.trim()) return "Name wajib diisi";
     if (!category.trim()) return "Category wajib diisi";
     if (!location.trim()) return "Location wajib diisi";
@@ -66,31 +67,53 @@ export default function OrganizerCreateEventPage() {
     if (price < 0) return "Price tidak boleh negatif";
     if (totalSeats < 1) return "Total seats minimal 1";
 
-    // ✅ untuk “nilai” lebih tinggi: wajib ada image
-    if (!imageFile) return "Poster/thumbnail wajib diupload (imageUrl)";
+    // ✅ image wajib (biar gak ada “No Image”)
+    if (!imageFile) return "Poster/thumbnail wajib diupload";
+
+    // validate size & type
+    const okType = ["image/jpeg", "image/png", "image/webp"].includes(imageFile.type);
+    if (!okType) return "Format image harus JPG/PNG/WEBP";
+
+    const maxBytes = MAX_FILE_MB * 1024 * 1024;
+    if (imageFile.size > maxBytes) return `Ukuran image max ${MAX_FILE_MB}MB`;
+
+    // validate dimensions
+    const { w, h } = await getImageSize(imageFile);
+    if (w < MIN_W || h < MIN_H) return `Resolusi minimal ${MIN_W}x${MIN_H}`;
 
     return null;
   };
 
-  const onPickFile = (f: File | null) => {
+  const onPickImage = async (file: File | null) => {
     setErr(null);
+    setImageFile(null);
+    setImagePreview(null);
 
-    if (!f) {
-      setImageFile(null);
-      setImagePreview(null);
+    if (!file) return;
+
+    const okType = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
+    if (!okType) {
+      setErr("Format image harus JPG/PNG/WEBP");
       return;
     }
 
-    const v = validateImage(f);
-    if (v) {
-      setImageFile(null);
-      setImagePreview(null);
-      setErr(v);
+    const maxBytes = MAX_FILE_MB * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setErr(`Ukuran image max ${MAX_FILE_MB}MB`);
       return;
     }
 
-    setImageFile(f);
-    setImagePreview(URL.createObjectURL(f));
+    try {
+      const { w, h } = await getImageSize(file);
+      if (w < MIN_W || h < MIN_H) {
+        setErr(`Resolusi minimal ${MIN_W}x${MIN_H}`);
+        return;
+      }
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    } catch {
+      setErr("File image tidak valid");
+    }
   };
 
   const onSubmit = async () => {
@@ -105,7 +128,7 @@ export default function OrganizerCreateEventPage() {
       return;
     }
 
-    const v = validate();
+    const v = await validate();
     if (v) {
       setErr(v);
       return;
@@ -116,10 +139,13 @@ export default function OrganizerCreateEventPage() {
 
     setSubmitting(true);
     try {
-      // 1) upload image ke cloudinary (signed)
-      const uploaded = await uploadToCloudinary(imageFile!, token, "event-platform/events");
+      // ✅ upload cloudinary dulu
+      let imageUrl: string | null = null;
+      if (imageFile) {
+        const up = await uploadToCloudinary(imageFile, token, "event-platform/events");
+        imageUrl = up.secureUrl;
+      }
 
-      // 2) create event ke backend pakai imageUrl
       const body = {
         name: name.trim(),
         category: category.trim(),
@@ -130,7 +156,7 @@ export default function OrganizerCreateEventPage() {
         price: Number(price),
         totalSeats: Number(totalSeats),
         isPublished,
-        imageUrl: uploaded.secureUrl, // ✅
+        imageUrl, // ✅ kirim ke backend
       };
 
       const res = await api<{ message: string; id: number }>(`/events`, {
@@ -183,7 +209,7 @@ export default function OrganizerCreateEventPage() {
           <div>
             <div className="text-2xl font-semibold">Create Event</div>
             <div className="mt-1 text-sm text-(--subtext)">
-              Upload 1 gambar (imageUrl) untuk poster/thumbnail. JPG/PNG/WebP, 20KB–5MB.
+              Poster wajib. Format JPG/PNG/WEBP, max {MAX_FILE_MB}MB, min {MIN_W}x{MIN_H}.
             </div>
           </div>
           <Link href="/" className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
@@ -197,42 +223,46 @@ export default function OrganizerCreateEventPage() {
           </div>
         )}
 
-        {/* Image uploader */}
+        {/* IMAGE PICKER */}
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="text-sm font-semibold">Event Image</div>
           <div className="text-xs text-(--subtext) mt-1">
-            Rekomendasi: rasio 16:9, resolusi min 1200x675.
+            Gunakan poster landscape biar bagus di card & detail.
           </div>
 
-          <div className="mt-3 grid gap-3 md:grid-cols-2 items-start">
-            <div>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm"
-              />
+          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center">
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+              className="text-sm"
+            />
 
-              {imageFile && (
-                <div className="mt-2 text-xs text-(--subtext)">
-                  Selected: <span className="text-white">{imageFile.name}</span> ({Math.round(imageFile.size / 1024)} KB)
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-(--muted) overflow-hidden">
-              {imagePreview ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imagePreview} alt="preview" className="w-full h-40 object-cover" />
-              ) : (
-                <div className="w-full h-40 flex items-center justify-center text-xs text-(--subtext)">
-                  Preview
-                </div>
-              )}
-            </div>
+            {imagePreview ? (
+              <div className="flex items-center gap-3">
+                <img
+                  src={imagePreview}
+                  alt="preview"
+                  className="h-24 w-40 rounded-xl object-cover border border-white/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null);
+                    setImagePreview(null);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="text-xs text-(--subtext)">No image selected</div>
+            )}
           </div>
         </div>
 
+        {/* FORM */}
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="text-xs text-(--subtext)">Name</div>

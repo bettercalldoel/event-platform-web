@@ -135,57 +135,57 @@ export default function EventDetailPage() {
 
   return (
     <div className="space-y-4">
-      {/* Banner Image */}
+      {/* IMAGE */}
       <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
         {data.imageUrl ? (
-          <img src={data.imageUrl} alt={data.name} className="w-full h-70 object-cover border-b border-white/10" />
+          <img src={data.imageUrl} alt={data.name} className="w-full h-70 object-cover" />
         ) : (
-          <div className="w-full h-70 bg-white/5 flex items-center justify-center text-sm text-(--subtext)">
-            No image
+          <div className="w-full h-70 bg-white/5 flex items-center justify-center text-xs text-(--subtext)">
+            No Image
           </div>
         )}
+      </div>
 
-        <div className="p-6">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-2xl font-semibold">{data.name}</div>
-              <div className="mt-1 text-sm text-(--subtext)">
-                {data.category} • {data.location}
-              </div>
-            </div>
-
-            <div className="text-right">
-              <div className="text-sm text-(--subtext)">Price</div>
-              <div className="text-xl font-semibold">
-                {data.price === 0 ? "Free" : formatIDR(data.price)}
-              </div>
+      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-2xl font-semibold">{data.name}</div>
+            <div className="mt-1 text-sm text-(--subtext)">
+              {data.category} • {data.location}
             </div>
           </div>
 
-          <div className="mt-4 text-sm text-(--text)/90 whitespace-pre-line">
-            {data.description}
+          <div className="text-right">
+            <div className="text-sm text-(--subtext)">Price</div>
+            <div className="text-xl font-semibold">
+              {data.price === 0 ? "Free" : formatIDR(data.price)}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 text-sm text-(--text)/90 whitespace-pre-line">
+          {data.description}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-(--subtext)">Schedule</div>
+            <div className="mt-1 text-sm">
+              {new Date(data.startAt).toLocaleString("id-ID")} —{" "}
+              {new Date(data.endAt).toLocaleString("id-ID")}
+            </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-xs text-(--subtext)">Schedule</div>
-              <div className="mt-1 text-sm">
-                {new Date(data.startAt).toLocaleString("id-ID")} —{" "}
-                {new Date(data.endAt).toLocaleString("id-ID")}
-              </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-(--subtext)">Seats</div>
+            <div className="mt-1 text-sm">
+              Remaining <span className="font-semibold">{data.remainingSeats}</span> / {data.totalSeats}
             </div>
+          </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-xs text-(--subtext)">Seats</div>
-              <div className="mt-1 text-sm">
-                Remaining <span className="font-semibold">{data.remainingSeats}</span> / {data.totalSeats}
-              </div>
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-              <div className="text-xs text-(--subtext)">Organizer</div>
-              <div className="mt-1 text-sm font-semibold">{data.organizer.name}</div>
-            </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-(--subtext)">Organizer</div>
+            <div className="mt-1 text-sm font-semibold">{data.organizer.name}</div>
           </div>
         </div>
       </div>
