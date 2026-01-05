@@ -35,10 +35,23 @@ type EventDetail = {
   totalSeats: number;
   remainingSeats: number;
   isPublished: boolean;
-  imageUrl?: string | null; // ✅
+  imageUrl?: string | null;
   organizer: { id: number; name: string };
   ticketTypes: TicketType[];
   vouchers: Voucher[];
+};
+
+type ReviewItem = {
+  id: number;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  user: { id: number; name: string };
+};
+
+type ReviewResponse = {
+  summary: { avgRating: number | null; totalReviews: number };
+  items: ReviewItem[];
 };
 
 export default function EventDetailPage() {
@@ -52,9 +65,12 @@ export default function EventDetailPage() {
   }, [params]);
 
   const [data, setData] = useState<EventDetail | null>(null);
+  const [reviews, setReviews] = useState<ReviewResponse | null>(null);
+
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // checkout form
   const [qty, setQty] = useState<number>(1);
   const [voucherCode, setVoucherCode] = useState<string>("");
   const [pointsUsed, setPointsUsed] = useState<number>(0);
@@ -65,8 +81,14 @@ export default function EventDetailPage() {
     setLoading(true);
     setErr(null);
 
-    api<EventDetail>(`/events/${id}`)
-      .then((res) => setData(res))
+    Promise.all([
+      api<EventDetail>(`/events/${id}`),
+      api<ReviewResponse>(`/events/${id}/reviews`),
+    ])
+      .then(([eventRes, reviewRes]) => {
+        setData(eventRes);
+        setReviews(reviewRes);
+      })
       .catch((e: any) => setErr(e.message))
       .finally(() => setLoading(false));
   }, [id]);
@@ -93,11 +115,19 @@ export default function EventDetailPage() {
     }
 
     try {
-      const body: any = { eventId: data.id, qty };
+      const body: any = {
+        eventId: data.id,
+        qty,
+      };
       if (voucherCode.trim()) body.voucherCode = voucherCode.trim();
       if (pointsUsed > 0) body.pointsUsed = pointsUsed;
 
-      await api(`/transactions`, { method: "POST", token, body });
+      await api(`/transactions`, {
+        method: "POST",
+        token,
+        body,
+      });
+
       router.push("/transactions");
     } catch (e: any) {
       setErr(e.message);
@@ -118,7 +148,10 @@ export default function EventDetailPage() {
         <div className="rounded-2xl border border-(--accent)/40 bg-(--accent)/10 p-4 text-sm">
           {err}
         </div>
-        <Link href="/" className="inline-block px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
+        <Link
+          href="/"
+          className="inline-block px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm"
+        >
           Back to events
         </Link>
       </div>
@@ -133,64 +166,86 @@ export default function EventDetailPage() {
     );
   }
 
+  const avg = reviews?.summary?.avgRating ?? null;
+  const total = reviews?.summary?.totalReviews ?? 0;
+
   return (
     <div className="space-y-4">
-      {/* IMAGE */}
+      {/* HEADER + IMAGE */}
       <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
         {data.imageUrl ? (
-          <img src={data.imageUrl} alt={data.name} className="w-full h-70 object-cover" />
+          <img src={data.imageUrl} alt={data.name} className="h-56 w-full object-cover" />
         ) : (
-          <div className="w-full h-70 bg-white/5 flex items-center justify-center text-xs text-(--subtext)">
+          <div className="h-56 w-full bg-white/5 flex items-center justify-center text-xs text-(--subtext)">
             No Image
           </div>
         )}
+
+        <div className="p-6">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-2xl font-semibold">{data.name}</div>
+              <div className="mt-1 text-sm text-(--subtext)">
+                {data.category} • {data.location}
+              </div>
+
+              {/* rating summary */}
+              <div className="mt-2 text-sm text-(--subtext)">
+                {total > 0 ? (
+                  <span>
+                    ⭐ <span className="text-white">{(avg ?? 0).toFixed(1)}</span>{" "}
+                    <span>({total} reviews)</span>
+                  </span>
+                ) : (
+                  <span>No reviews yet</span>
+                )}
+              </div>
+            </div>
+
+            <div className="text-right">
+              <div className="text-sm text-(--subtext)">Price</div>
+              <div className="text-xl font-semibold">
+                {data.price === 0 ? "Free" : formatIDR(data.price)}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 text-sm text-(--text)/90 whitespace-pre-line">
+            {data.description}
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-xs text-(--subtext)">Schedule</div>
+              <div className="mt-1 text-sm">
+                {new Date(data.startAt).toLocaleString("id-ID")} —{" "}
+                {new Date(data.endAt).toLocaleString("id-ID")}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-xs text-(--subtext)">Seats</div>
+              <div className="mt-1 text-sm">
+                Remaining <span className="font-semibold">{data.remainingSeats}</span> /{" "}
+                {data.totalSeats}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="text-xs text-(--subtext)">Organizer</div>
+              <Link
+  href={`/organizers/${data.organizer.id}`}
+  className="mt-1 inline-block text-sm font-semibold hover:underline"
+>
+  {data.organizer.name}
+</Link>
+
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-2xl font-semibold">{data.name}</div>
-            <div className="mt-1 text-sm text-(--subtext)">
-              {data.category} • {data.location}
-            </div>
-          </div>
-
-          <div className="text-right">
-            <div className="text-sm text-(--subtext)">Price</div>
-            <div className="text-xl font-semibold">
-              {data.price === 0 ? "Free" : formatIDR(data.price)}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 text-sm text-(--text)/90 whitespace-pre-line">
-          {data.description}
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-xs text-(--subtext)">Schedule</div>
-            <div className="mt-1 text-sm">
-              {new Date(data.startAt).toLocaleString("id-ID")} —{" "}
-              {new Date(data.endAt).toLocaleString("id-ID")}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-xs text-(--subtext)">Seats</div>
-            <div className="mt-1 text-sm">
-              Remaining <span className="font-semibold">{data.remainingSeats}</span> / {data.totalSeats}
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-xs text-(--subtext)">Organizer</div>
-            <div className="mt-1 text-sm font-semibold">{data.organizer.name}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Checkout */}
+      {/* CHECKOUT */}
       <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -282,6 +337,33 @@ export default function EventDetailPage() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* REVIEWS LIST */}
+      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+        <div className="text-lg font-semibold">Reviews</div>
+        <div className="mt-1 text-sm text-(--subtext)">
+          {total > 0 ? `${total} review(s)` : "Belum ada review untuk event ini."}
+        </div>
+
+        {reviews?.items?.length ? (
+          <div className="mt-4 space-y-3">
+            {reviews.items.map((r) => (
+              <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-semibold">{r.user.name}</div>
+                  <div className="text-sm">⭐ {r.rating}</div>
+                </div>
+                {r.comment ? (
+                  <div className="mt-2 text-sm text-(--text)/90 whitespace-pre-line">{r.comment}</div>
+                ) : null}
+                <div className="mt-2 text-xs text-(--subtext)">
+                  {new Date(r.createdAt).toLocaleString("id-ID")}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

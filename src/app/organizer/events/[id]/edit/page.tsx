@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
-const MAX_IMAGE_MB = 5; // cukup aman utk poster
+const MAX_IMAGE_MB = 5;
 const MIN_IMAGE_KB = 20;
 
 function bytesToMB(b: number) {
@@ -17,32 +17,65 @@ function bytesToKB(b: number) {
   return b / 1024;
 }
 
-export default function OrganizerCreateEventPage() {
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const mi = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+}
+
+type EventDetail = {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  location: string;
+  startAt: string;
+  endAt: string;
+  price: number;
+  totalSeats: number;
+  remainingSeats: number;
+  isPublished: boolean;
+  imageUrl?: string | null;
+  organizer: { id: number; name: string };
+};
+
+export default function OrganizerEditEventPage() {
   const router = useRouter();
+  const params = useParams();
   const { user, token, loading } = useAuth();
 
+  const id = useMemo(() => {
+    const raw = (params as any)?.id;
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    const n = Number(s);
+    return Number.isNaN(n) ? null : n;
+  }, [params]);
+
+  const [data, setData] = useState<EventDetail | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  // form
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("Tech");
-  const [location, setLocation] = useState("Jakarta");
+  const [category, setCategory] = useState("");
+  const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [startAt, setStartAt] = useState(""); // datetime-local
-  const [endAt, setEndAt] = useState(""); // datetime-local
+  const [endAt, setEndAt] = useState("");
   const [price, setPrice] = useState<number>(0);
-  const [totalSeats, setTotalSeats] = useState<number>(100);
+  const [totalSeats, setTotalSeats] = useState<number>(1);
   const [isPublished, setIsPublished] = useState(true);
 
-  // ✅ image
+  // image
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>("");
+  const [imageUrl, setImageUrl] = useState<string>(""); // empty allowed = remove
   const [uploading, setUploading] = useState(false);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const canAccess = useMemo(() => {
-    if (loading) return false;
-    return !!token && user?.role === "ORGANIZER";
-  }, [loading, token, user]);
 
   const validateImage = (file: File) => {
     if (!file.type.startsWith("image/")) return "File harus berupa gambar (jpg/png/webp)";
@@ -72,6 +105,46 @@ export default function OrganizerCreateEventPage() {
     return null;
   };
 
+  const load = async () => {
+    if (!id) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      const res = await api<EventDetail>(`/events/${id}`);
+      setData(res);
+
+      // prefill
+      setName(res.name);
+      setCategory(res.category);
+      setLocation(res.location);
+      setDescription(res.description);
+      setStartAt(toLocalInput(res.startAt));
+      setEndAt(toLocalInput(res.endAt));
+      setPrice(res.price);
+      setTotalSeats(res.totalSeats);
+      setIsPublished(res.isPublished);
+      setImageUrl(res.imageUrl ?? "");
+    } catch (e: any) {
+      setErr(e.message || "Failed to load event");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user || !token) {
+      router.push("/login");
+      return;
+    }
+    if (user.role !== "ORGANIZER") {
+      router.push("/");
+      return;
+    }
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, token, id]);
+
   const uploadImage = async () => {
     setErr(null);
     if (!token) {
@@ -99,17 +172,13 @@ export default function OrganizerCreateEventPage() {
     }
   };
 
-  const onSubmit = async () => {
+  const onSave = async () => {
     setErr(null);
-
     if (!token) {
       router.push("/login");
       return;
     }
-    if (user?.role !== "ORGANIZER") {
-      setErr("Akses ditolak. Login sebagai ORGANIZER.");
-      return;
-    }
+    if (!id) return;
 
     const v = validate();
     if (v) {
@@ -117,10 +186,10 @@ export default function OrganizerCreateEventPage() {
       return;
     }
 
-    const ok = window.confirm("Create event ini?");
+    const ok = window.confirm("Simpan perubahan event ini?");
     if (!ok) return;
 
-    setSubmitting(true);
+    setBusy(true);
     try {
       const body: any = {
         name: name.trim(),
@@ -134,47 +203,43 @@ export default function OrganizerCreateEventPage() {
         isPublished,
       };
 
-      if (imageUrl.trim()) body.imageUrl = imageUrl.trim();
+      // ✅ imageUrl:
+      // - kalau kosong => hapus
+      // - kalau ada => update
+      body.imageUrl = imageUrl.trim() ? imageUrl.trim() : "";
 
-      const res = await api<{ message: string; id: number }>(`/events`, {
-        method: "POST",
-        token,
-        body,
-      });
-
-      router.push(`/events/${res.id}`);
+      await api(`/events/${id}`, { method: "PATCH", token, body });
+      router.push(`/events/${id}`);
     } catch (e: any) {
-      setErr(e.message);
+      setErr(e.message || "Update failed");
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
 
-  if (loading) {
+  if (loading || busy && !data) {
     return (
       <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
-        Loading…
+        Loading event…
       </div>
     );
   }
 
-  if (!canAccess) {
+  if (!id) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
-        <div className="text-xl font-semibold">Create Event</div>
-        <div className="mt-2 text-sm text-(--subtext)">Halaman ini khusus ORGANIZER.</div>
+      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm">
+        Invalid event id
+      </div>
+    );
+  }
 
-        <div className="mt-4 flex gap-2">
-          <Link
-            href="/login"
-            className="px-4 py-2 rounded-xl bg-(--primary)/25 hover:bg-(--primary)/35 border border-(--primary)/40 text-sm"
-          >
-            Login
-          </Link>
-          <Link href="/" className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
-            Back
-          </Link>
-        </div>
+  if (err) {
+    return (
+      <div className="space-y-3">
+        <div className="rounded-2xl border border-(--accent)/40 bg-(--accent)/10 p-4 text-sm">{err}</div>
+        <Link href="/organizer" className="inline-block px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
+          Back to Organizer
+        </Link>
       </div>
     );
   }
@@ -184,17 +249,31 @@ export default function OrganizerCreateEventPage() {
       <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-2xl font-semibold">Create Event</div>
-            <div className="mt-1 text-sm text-(--subtext)">Buat event baru. Free event = price 0.</div>
+            <div className="text-2xl font-semibold">Edit Event</div>
+            <div className="mt-1 text-sm text-(--subtext)">
+              Update data event + update / remove image.
+            </div>
           </div>
-          <Link href="/" className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
-            Browse Events
-          </Link>
+
+          <div className="flex gap-2">
+            <Link
+              href={`/events/${id}`}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm"
+            >
+              View
+            </Link>
+            <Link
+              href="/organizer"
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm"
+            >
+              Back
+            </Link>
+          </div>
         </div>
 
-        {err && (
+        {data?.organizer?.id && user?.id && data.organizer.id !== user.id && (
           <div className="mt-4 rounded-xl border border-(--accent)/40 bg-(--accent)/10 p-3 text-sm">
-            {err}
+            Warning: event ini bukan milik kamu. Saat Save, backend akan menolak (403).
           </div>
         )}
 
@@ -204,22 +283,20 @@ export default function OrganizerCreateEventPage() {
             <div>
               <div className="font-semibold">Event Image</div>
               <div className="text-xs text-(--subtext) mt-1">
-                Recommended: jpg/png/webp, min {MIN_IMAGE_KB}KB, max {MAX_IMAGE_MB}MB.
+                jpg/png/webp, min {MIN_IMAGE_KB}KB, max {MAX_IMAGE_MB}MB.
               </div>
             </div>
 
-            {imageUrl ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setImageUrl("");
-                  setImageFile(null);
-                }}
-                className="px-3 py-2 rounded-xl bg-(--accent)/20 hover:bg-(--accent)/30 border border-(--accent)/40 text-sm"
-              >
-                Remove
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                setImageUrl("");
+                setImageFile(null);
+              }}
+              className="px-3 py-2 rounded-xl bg-(--accent)/20 hover:bg-(--accent)/30 border border-(--accent)/40 text-sm"
+            >
+              Remove Image
+            </button>
           </div>
 
           <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -242,13 +319,11 @@ export default function OrganizerCreateEventPage() {
                     : "bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
                 }`}
               >
-                {uploading ? "Uploading…" : "Upload to Cloudinary"}
+                {uploading ? "Uploading…" : "Upload New Image"}
               </button>
 
               {imageUrl && (
-                <div className="mt-2 text-xs text-(--subtext)">
-                  Uploaded ✅
-                </div>
+                <div className="mt-2 text-xs text-(--subtext)">Current image set ✅</div>
               )}
             </div>
 
@@ -273,7 +348,6 @@ export default function OrganizerCreateEventPage() {
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Jakarta Tech Meetup"
               className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
             />
           </div>
@@ -283,7 +357,6 @@ export default function OrganizerCreateEventPage() {
             <input
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="Tech"
               className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
             />
           </div>
@@ -293,7 +366,6 @@ export default function OrganizerCreateEventPage() {
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              placeholder="Jakarta"
               className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
             />
           </div>
@@ -335,7 +407,6 @@ export default function OrganizerCreateEventPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              placeholder="Meetup untuk networking developer"
               className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
             />
           </div>
@@ -349,6 +420,9 @@ export default function OrganizerCreateEventPage() {
               onChange={(e) => setTotalSeats(Number(e.target.value))}
               className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
             />
+            <div className="mt-2 text-xs text-(--subtext)">
+              Remaining saat ini: <b className="text-white">{data?.remainingSeats ?? "-"}</b>
+            </div>
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center justify-between">
@@ -366,15 +440,15 @@ export default function OrganizerCreateEventPage() {
         </div>
 
         <button
-          onClick={onSubmit}
-          disabled={submitting}
+          onClick={onSave}
+          disabled={busy}
           className={`mt-5 w-full px-4 py-3 rounded-xl text-sm border ${
-            submitting
+            busy
               ? "bg-white/5 border-white/10 opacity-60 cursor-not-allowed"
               : "bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
           }`}
         >
-          {submitting ? "Creating…" : "Create Event"}
+          {busy ? "Saving…" : "Save Changes"}
         </button>
       </div>
     </div>

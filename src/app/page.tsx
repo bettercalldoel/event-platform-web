@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { api, formatIDR } from "@/lib/api";
 
 type EventItem = {
@@ -27,6 +28,8 @@ function useDebounce<T>(value: T, delay = 400) {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
@@ -103,13 +106,19 @@ export default function HomePage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((e) => (
-            <Link
+            <div
               key={e.id}
-              href={`/events/${e.id}`}
-              className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden hover:border-white/20 transition"
+              role="button"
+              tabIndex={0}
+              onClick={() => router.push(`/events/${e.id}`)}
+              onKeyDown={(ev) => {
+                if (ev.key === "Enter") router.push(`/events/${e.id}`);
+              }}
+              className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden hover:border-white/20 transition cursor-pointer"
             >
               {/* IMAGE */}
               {e.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img src={e.imageUrl} alt={e.name} className="h-40 w-full object-cover" />
               ) : (
                 <div className="h-40 w-full bg-white/5 flex items-center justify-center text-xs text-(--subtext)">
@@ -132,11 +141,19 @@ export default function HomePage() {
                   </div>
                 </div>
 
+                {/* ✅ LINK ORGANIZER (stop click bubble biar gak ke event detail) */}
                 <div className="text-xs text-(--subtext)">
-                  By {e.organizer?.name ?? "Organizer"}
+                  By{" "}
+                  <Link
+                    href={`/organizers/${e.organizer.id}`}
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="text-(--primary) hover:underline"
+                  >
+                    {e.organizer?.name ?? "Organizer"}
+                  </Link>
                 </div>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}
