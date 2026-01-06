@@ -7,34 +7,12 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { uploadToCloudinary } from "@/lib/cloudinary";
 
-const MAX_IMAGE_MB = 5;
-const MIN_IMAGE_KB = 20;
-
-function bytesToMB(b: number) {
-  return b / 1024 / 1024;
-}
-function bytesToKB(b: number) {
-  return b / 1024;
-}
-
-function toLocalInput(iso: string) {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const hh = pad(d.getHours());
-  const mi = pad(d.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-}
-
-type EventDetail = {
+type OrgEventDetail = {
   id: number;
   name: string;
-  description: string;
   category: string;
   location: string;
+  description: string;
   startAt: string;
   endAt: string;
   price: number;
@@ -42,48 +20,134 @@ type EventDetail = {
   remainingSeats: number;
   isPublished: boolean;
   imageUrl?: string | null;
-  organizer: { id: number; name: string };
 };
 
+function toLocalDateTimeInput(iso: string) {
+  const d = new Date(iso);
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16); // YYYY-MM-DDTHH:mm
+}
+
+function validateImage(file: File) {
+  const allowed = ["image/jpeg", "image/png", "image/webp"];
+  const min = 10 * 1024; // 10KB
+  const max = 5 * 1024 * 1024; // 5MB
+
+  if (!allowed.includes(file.type)) return "Format harus JPG/PNG/WebP";
+  if (file.size < min) return "Ukuran gambar terlalu kecil (min 10KB)";
+  if (file.size > max) return "Ukuran gambar terlalu besar (max 5MB)";
+  return null;
+}
+
 export default function OrganizerEditEventPage() {
-  const router = useRouter();
   const params = useParams();
+  const router = useRouter();
   const { user, token, loading } = useAuth();
+
+  const authToken = token ?? (typeof window !== "undefined" ? localStorage.getItem("token") : null);
 
   const id = useMemo(() => {
     const raw = (params as any)?.id;
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    const n = Number(s);
-    return Number.isNaN(n) ? null : n;
+    return Array.isArray(raw) ? raw[0] : raw;
   }, [params]);
 
-  const [data, setData] = useState<EventDetail | null>(null);
+  const [busy, setBusy] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
 
-  // form
+  // form fields
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [startAt, setStartAt] = useState(""); // datetime-local
-  const [endAt, setEndAt] = useState("");
+  const [endAt, setEndAt] = useState(""); // datetime-local
   const [price, setPrice] = useState<number>(0);
   const [totalSeats, setTotalSeats] = useState<number>(1);
-  const [isPublished, setIsPublished] = useState(true);
+  const [isPublished, setIsPublished] = useState<boolean>(true);
 
   // image
+  const [imageUrl, setImageUrl] = useState<string>("");
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>(""); // empty allowed = remove
   const [uploading, setUploading] = useState(false);
 
-  const validateImage = (file: File) => {
-    if (!file.type.startsWith("image/")) return "File harus berupa gambar (jpg/png/webp)";
-    const kb = bytesToKB(file.size);
-    const mb = bytesToMB(file.size);
-    if (kb < MIN_IMAGE_KB) return `Ukuran gambar terlalu kecil (< ${MIN_IMAGE_KB}KB)`;
-    if (mb > MAX_IMAGE_MB) return `Ukuran gambar maksimal ${MAX_IMAGE_MB}MB`;
-    return null;
+  const load = async () => {
+    if (!authToken) return;
+    const res = await api<{ event: OrgEventDetail }>(`/organizer/events/${id}`, { token: authToken });
+    const e = res.event;
+
+    setName(e.name ?? "");
+    setCategory(e.category ?? "");
+    setLocation(e.location ?? "");
+    setDescription(e.description ?? "");
+    setStartAt(toLocalDateTimeInput(e.startAt));
+    setEndAt(toLocalDateTimeInput(e.endAt));
+    setPrice(Number(e.price ?? 0));
+    setTotalSeats(Number(e.totalSeats ?? 1));
+    setIsPublished(!!e.isPublished);
+    setImageUrl(e.imageUrl ?? "");
+  };
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!user) {
+      router.push("/login");
+      return;
+    }
+    if (user.role !== "ORGANIZER") {
+      router.push("/");
+      return;
+    }
+    if (!authToken) {
+      setErr("Token tidak ditemukan. Coba logout lalu login lagi.");
+      setBusy(false);
+      return;
+    }
+    if (!id) return;
+
+    setBusy(true);
+    setErr(null);
+    load()
+      .catch((e: any) => setErr(e.message))
+      .finally(() => setBusy(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user, authToken, id]);
+
+  const onPickImage = (file: File | null) => {
+    setErr(null);
+    setImageFile(null);
+    if (!file) return;
+
+    const v = validateImage(file);
+    if (v) {
+      setErr(v);
+      return;
+    }
+    setImageFile(file);
+  };
+
+  const uploadImage = async () => {
+    setErr(null);
+    if (!authToken) {
+      router.push("/login");
+      return;
+    }
+    if (!imageFile) {
+      setErr("Pilih file gambar dulu.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const up = await uploadToCloudinary(imageFile, authToken, "event-platform/events");
+      setImageUrl(up.secureUrl);
+      setImageFile(null);
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const validate = () => {
@@ -105,80 +169,13 @@ export default function OrganizerEditEventPage() {
     return null;
   };
 
-  const load = async () => {
-    if (!id) return;
-    setErr(null);
-    setBusy(true);
-    try {
-      const res = await api<EventDetail>(`/events/${id}`);
-      setData(res);
-
-      // prefill
-      setName(res.name);
-      setCategory(res.category);
-      setLocation(res.location);
-      setDescription(res.description);
-      setStartAt(toLocalInput(res.startAt));
-      setEndAt(toLocalInput(res.endAt));
-      setPrice(res.price);
-      setTotalSeats(res.totalSeats);
-      setIsPublished(res.isPublished);
-      setImageUrl(res.imageUrl ?? "");
-    } catch (e: any) {
-      setErr(e.message || "Failed to load event");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  useEffect(() => {
-    if (loading) return;
-    if (!user || !token) {
-      router.push("/login");
-      return;
-    }
-    if (user.role !== "ORGANIZER") {
-      router.push("/");
-      return;
-    }
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, user, token, id]);
-
-  const uploadImage = async () => {
-    setErr(null);
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    if (!imageFile) {
-      setErr("Pilih file gambar dulu");
-      return;
-    }
-    const v = validateImage(imageFile);
-    if (v) {
-      setErr(v);
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const up = await uploadToCloudinary(imageFile, token, "event-platform/events");
-      setImageUrl(up.secureUrl);
-    } catch (e: any) {
-      setErr(e.message || "Upload gagal");
-    } finally {
-      setUploading(false);
-    }
-  };
-
   const onSave = async () => {
     setErr(null);
-    if (!token) {
+
+    if (!authToken) {
       router.push("/login");
       return;
     }
-    if (!id) return;
 
     const v = validate();
     if (v) {
@@ -186,12 +183,12 @@ export default function OrganizerEditEventPage() {
       return;
     }
 
-    const ok = window.confirm("Simpan perubahan event ini?");
+    const ok = window.confirm("Update event ini?");
     if (!ok) return;
 
-    setBusy(true);
+    setSubmitting(true);
     try {
-      const body: any = {
+      const body = {
         name: name.trim(),
         category: category.trim(),
         location: location.trim(),
@@ -201,45 +198,23 @@ export default function OrganizerEditEventPage() {
         price: Number(price),
         totalSeats: Number(totalSeats),
         isPublished,
+        imageUrl: imageUrl.trim() ? imageUrl.trim() : null,
       };
 
-      // ✅ imageUrl:
-      // - kalau kosong => hapus
-      // - kalau ada => update
-      body.imageUrl = imageUrl.trim() ? imageUrl.trim() : "";
+      await api(`/events/${id}`, { method: "PATCH", token: authToken, body });
 
-      await api(`/events/${id}`, { method: "PATCH", token, body });
-      router.push(`/events/${id}`);
+      router.push("/organizer");
     } catch (e: any) {
-      setErr(e.message || "Update failed");
+      setErr(e.message);
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   };
 
-  if (loading || busy && !data) {
+  if (busy) {
     return (
       <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
         Loading event…
-      </div>
-    );
-  }
-
-  if (!id) {
-    return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm">
-        Invalid event id
-      </div>
-    );
-  }
-
-  if (err) {
-    return (
-      <div className="space-y-3">
-        <div className="rounded-2xl border border-(--accent)/40 bg-(--accent)/10 p-4 text-sm">{err}</div>
-        <Link href="/organizer" className="inline-block px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
-          Back to Organizer
-        </Link>
       </div>
     );
   }
@@ -250,105 +225,78 @@ export default function OrganizerEditEventPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-2xl font-semibold">Edit Event</div>
-            <div className="mt-1 text-sm text-(--subtext)">
-              Update data event + update / remove image.
-            </div>
+            <div className="mt-1 text-sm text-(--subtext)">Update info event + imageUrl.</div>
           </div>
 
           <div className="flex gap-2">
-            <Link
-              href={`/events/${id}`}
-              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm"
-            >
-              View
-            </Link>
-            <Link
-              href="/organizer"
-              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm"
-            >
+            <Link href="/organizer" className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-sm">
               Back
             </Link>
           </div>
         </div>
 
-        {data?.organizer?.id && user?.id && data.organizer.id !== user.id && (
+        {err && (
           <div className="mt-4 rounded-xl border border-(--accent)/40 bg-(--accent)/10 p-3 text-sm">
-            Warning: event ini bukan milik kamu. Saat Save, backend akan menolak (403).
+            {err}
           </div>
         )}
 
-        {/* IMAGE */}
+        {/* Image */}
         <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="font-semibold">Event Image</div>
-              <div className="text-xs text-(--subtext) mt-1">
-                jpg/png/webp, min {MIN_IMAGE_KB}KB, max {MAX_IMAGE_MB}MB.
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setImageUrl("");
-                setImageFile(null);
-              }}
-              className="px-3 py-2 rounded-xl bg-(--accent)/20 hover:bg-(--accent)/30 border border-(--accent)/40 text-sm"
-            >
-              Remove Image
-            </button>
+          <div className="text-sm font-semibold">Event Image</div>
+          <div className="text-xs text-(--subtext) mt-1">
+            Saran: JPG/PNG/WebP, max 5MB. Cocok buat poster + thumbnail (gabung 1).
           </div>
 
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-white/10 bg-(--surface) p-3">
-              <div className="text-xs text-(--subtext)">Choose file</div>
+            <div className="rounded-xl overflow-hidden border border-white/10 bg-(--surface)">
+              {imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={imageUrl} alt="event image" className="w-full h-48 object-cover" />
+              ) : (
+                <div className="w-full h-48 flex items-center justify-center text-xs text-(--subtext)">
+                  No image
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <input
                 type="file"
-                accept="image/*"
-                onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
-                className="mt-2 w-full text-sm"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={(e) => onPickImage(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm"
               />
 
               <button
                 type="button"
                 onClick={uploadImage}
-                disabled={uploading || !imageFile}
-                className={`mt-3 w-full px-4 py-3 rounded-xl text-sm border ${
-                  uploading || !imageFile
+                disabled={!imageFile || uploading}
+                className={`w-full px-4 py-3 rounded-xl text-sm border ${
+                  !imageFile || uploading
                     ? "bg-white/5 border-white/10 opacity-60 cursor-not-allowed"
-                    : "bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
+                    : "bg-(--primary)/20 hover:bg-(--primary)/30 border-(--primary)/40"
                 }`}
               >
-                {uploading ? "Uploading…" : "Upload New Image"}
+                {uploading ? "Uploading…" : "Upload to Cloudinary"}
               </button>
 
-              {imageUrl && (
-                <div className="mt-2 text-xs text-(--subtext)">Current image set ✅</div>
-              )}
-            </div>
-
-            <div className="rounded-xl border border-white/10 bg-(--surface) p-3">
-              <div className="text-xs text-(--subtext)">Preview</div>
-              {imageUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={imageUrl} alt="preview" className="mt-2 h-44 w-full rounded-xl object-cover" />
-              ) : (
-                <div className="mt-2 h-44 w-full rounded-xl bg-white/5 flex items-center justify-center text-xs text-(--subtext)">
-                  No image
-                </div>
-              )}
+              <div className="text-xs text-(--subtext)">
+                Current imageUrl:
+                <div className="break-all mt-1">{imageUrl ? imageUrl : "-"}</div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* FORM */}
+        {/* Form */}
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="text-xs text-(--subtext)">Name</div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -357,7 +305,7 @@ export default function OrganizerEditEventPage() {
             <input
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -366,7 +314,7 @@ export default function OrganizerEditEventPage() {
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -377,7 +325,7 @@ export default function OrganizerEditEventPage() {
               min={0}
               value={price}
               onChange={(e) => setPrice(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -387,7 +335,7 @@ export default function OrganizerEditEventPage() {
               type="datetime-local"
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -397,7 +345,7 @@ export default function OrganizerEditEventPage() {
               type="datetime-local"
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -407,7 +355,7 @@ export default function OrganizerEditEventPage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
           </div>
 
@@ -418,10 +366,10 @@ export default function OrganizerEditEventPage() {
               min={1}
               value={totalSeats}
               onChange={(e) => setTotalSeats(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
             />
-            <div className="mt-2 text-xs text-(--subtext)">
-              Remaining saat ini: <b className="text-white">{data?.remainingSeats ?? "-"}</b>
+            <div className="text-xs text-(--subtext) mt-1">
+              Note: tidak boleh lebih kecil dari seats yang sudah terpakai.
             </div>
           </div>
 
@@ -441,14 +389,14 @@ export default function OrganizerEditEventPage() {
 
         <button
           onClick={onSave}
-          disabled={busy}
+          disabled={submitting}
           className={`mt-5 w-full px-4 py-3 rounded-xl text-sm border ${
-            busy
+            submitting
               ? "bg-white/5 border-white/10 opacity-60 cursor-not-allowed"
               : "bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
           }`}
         >
-          {busy ? "Saving…" : "Save Changes"}
+          {submitting ? "Saving…" : "Save Changes"}
         </button>
       </div>
     </div>

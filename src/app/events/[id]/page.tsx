@@ -36,6 +36,7 @@ type EventDetail = {
   remainingSeats: number;
   isPublished: boolean;
   imageUrl?: string | null;
+
   organizer: { id: number; name: string };
   ticketTypes: TicketType[];
   vouchers: Voucher[];
@@ -49,7 +50,7 @@ type ReviewItem = {
   user: { id: number; name: string };
 };
 
-type ReviewResponse = {
+type ReviewListRes = {
   summary: { avgRating: number | null; totalReviews: number };
   items: ReviewItem[];
 };
@@ -61,19 +62,54 @@ export default function EventDetailPage() {
 
   const id = useMemo(() => {
     const raw = (params as any)?.id;
-    return Array.isArray(raw) ? raw[0] : raw;
+    const v = Array.isArray(raw) ? raw[0] : raw;
+    return v ? String(v) : "";
   }, [params]);
 
   const [data, setData] = useState<EventDetail | null>(null);
-  const [reviews, setReviews] = useState<ReviewResponse | null>(null);
-
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // checkout form
+  // checkout
   const [qty, setQty] = useState<number>(1);
   const [voucherCode, setVoucherCode] = useState<string>("");
   const [pointsUsed, setPointsUsed] = useState<number>(0);
+
+  // reviews
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsErr, setReviewsErr] = useState<string | null>(null);
+  const [reviewSummary, setReviewSummary] = useState<ReviewListRes["summary"]>({
+    avgRating: null,
+    totalReviews: 0,
+  });
+  const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
+
+  // create review (optional)
+  const [myRating, setMyRating] = useState<number>(5);
+  const [myComment, setMyComment] = useState<string>("");
+
+  const loadEvent = async () => {
+    if (!id) return;
+    const res = await api<EventDetail>(`/events/${id}`);
+    setData(res);
+  };
+
+  const loadReviews = async () => {
+    if (!id) return;
+
+    setReviewsLoading(true);
+    setReviewsErr(null);
+    try {
+      // ✅ PENTING: pakai api() biar ke port 4000, bukan /events/... di 3000
+      const res = await api<ReviewListRes>(`/events/${id}/reviews`);
+      setReviewSummary(res.summary);
+      setReviewItems(res.items ?? []);
+    } catch (e: any) {
+      setReviewsErr(e.message);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -81,16 +117,10 @@ export default function EventDetailPage() {
     setLoading(true);
     setErr(null);
 
-    Promise.all([
-      api<EventDetail>(`/events/${id}`),
-      api<ReviewResponse>(`/events/${id}/reviews`),
-    ])
-      .then(([eventRes, reviewRes]) => {
-        setData(eventRes);
-        setReviews(reviewRes);
-      })
+    Promise.all([loadEvent(), loadReviews()])
       .catch((e: any) => setErr(e.message))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const canCheckout = useMemo(() => {
@@ -122,15 +152,53 @@ export default function EventDetailPage() {
       if (voucherCode.trim()) body.voucherCode = voucherCode.trim();
       if (pointsUsed > 0) body.pointsUsed = pointsUsed;
 
-      await api(`/transactions`, {
+      const res = await api(`/transactions`, {
         method: "POST",
         token,
         body,
       });
 
-      router.push("/transactions");
+      const trxId = (res as any)?.transaction?.id;
+      if (trxId) router.push("/transactions");
+      else router.push("/transactions");
     } catch (e: any) {
       setErr(e.message);
+    }
+  };
+
+  const submitReview = async () => {
+    setReviewsErr(null);
+
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+    if (!user || user.role !== "CUSTOMER") {
+      setReviewsErr("Hanya CUSTOMER yang bisa review.");
+      return;
+    }
+
+    const rating = Number(myRating);
+    if (!rating || rating < 1 || rating > 5) {
+      setReviewsErr("Rating harus 1–5");
+      return;
+    }
+
+    try {
+      await api(`/events/${id}/reviews`, {
+        method: "POST",
+        token,
+        body: {
+          rating,
+          comment: myComment.trim() ? myComment.trim() : null,
+        },
+      });
+
+      setMyComment("");
+      setMyRating(5);
+      await loadReviews();
+    } catch (e: any) {
+      setReviewsErr(e.message);
     }
   };
 
@@ -166,12 +234,9 @@ export default function EventDetailPage() {
     );
   }
 
-  const avg = reviews?.summary?.avgRating ?? null;
-  const total = reviews?.summary?.totalReviews ?? 0;
-
   return (
     <div className="space-y-4">
-      {/* HEADER + IMAGE */}
+      {/* HERO */}
       <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
         {data.imageUrl ? (
           <img src={data.imageUrl} alt={data.name} className="h-56 w-full object-cover" />
@@ -187,18 +252,6 @@ export default function EventDetailPage() {
               <div className="text-2xl font-semibold">{data.name}</div>
               <div className="mt-1 text-sm text-(--subtext)">
                 {data.category} • {data.location}
-              </div>
-
-              {/* rating summary */}
-              <div className="mt-2 text-sm text-(--subtext)">
-                {total > 0 ? (
-                  <span>
-                    ⭐ <span className="text-white">{(avg ?? 0).toFixed(1)}</span>{" "}
-                    <span>({total} reviews)</span>
-                  </span>
-                ) : (
-                  <span>No reviews yet</span>
-                )}
               </div>
             </div>
 
@@ -233,13 +286,7 @@ export default function EventDetailPage() {
 
             <div className="rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="text-xs text-(--subtext)">Organizer</div>
-              <Link
-  href={`/organizers/${data.organizer.id}`}
-  className="mt-1 inline-block text-sm font-semibold hover:underline"
->
-  {data.organizer.name}
-</Link>
-
+              <div className="mt-1 text-sm font-semibold">{data.organizer.name}</div>
             </div>
           </div>
         </div>
@@ -339,31 +386,95 @@ export default function EventDetailPage() {
         )}
       </div>
 
-      {/* REVIEWS LIST */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
-        <div className="text-lg font-semibold">Reviews</div>
-        <div className="mt-1 text-sm text-(--subtext)">
-          {total > 0 ? `${total} review(s)` : "Belum ada review untuk event ini."}
+      {/* REVIEWS */}
+      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-lg font-semibold">Reviews</div>
+            <div className="text-sm text-(--subtext) mt-1">
+              Avg:{" "}
+              <span className="text-white">
+                {reviewSummary.avgRating === null ? "-" : reviewSummary.avgRating.toFixed(1)}
+              </span>{" "}
+              • Total: <span className="text-white">{reviewSummary.totalReviews}</span>
+            </div>
+          </div>
+
+          <button
+            onClick={() => loadReviews()}
+            className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
+          >
+            Refresh
+          </button>
         </div>
 
-        {reviews?.items?.length ? (
-          <div className="mt-4 space-y-3">
-            {reviews.items.map((r) => (
+        {reviewsErr && (
+          <div className="rounded-xl border border-(--accent)/40 bg-(--accent)/10 p-3 text-sm">
+            {reviewsErr}
+          </div>
+        )}
+
+        {reviewsLoading ? (
+          <div className="text-sm text-(--subtext)">Loading reviews…</div>
+        ) : reviewItems.length === 0 ? (
+          <div className="text-sm text-(--subtext)">Belum ada review.</div>
+        ) : (
+          <div className="space-y-3">
+            {reviewItems.map((r) => (
               <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center justify-between">
-                  <div className="font-semibold">{r.user.name}</div>
-                  <div className="text-sm">⭐ {r.rating}</div>
+                  <div className="text-sm font-semibold">{r.user.name}</div>
+                  <div className="text-xs text-(--subtext)">
+                    {new Date(r.createdAt).toLocaleString("id-ID")}
+                  </div>
                 </div>
-                {r.comment ? (
-                  <div className="mt-2 text-sm text-(--text)/90 whitespace-pre-line">{r.comment}</div>
-                ) : null}
-                <div className="mt-2 text-xs text-(--subtext)">
-                  {new Date(r.createdAt).toLocaleString("id-ID")}
+                <div className="mt-1 text-sm">
+                  Rating: <span className="font-semibold">{r.rating}</span>/5
                 </div>
+                {r.comment && <div className="mt-2 text-sm text-(--text)/90">{r.comment}</div>}
               </div>
             ))}
           </div>
-        ) : null}
+        )}
+
+        {/* Create review (optional) */}
+        {user?.role === "CUSTOMER" && (
+          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="font-semibold">Write a review</div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <div className="text-xs text-(--subtext)">Rating (1–5)</div>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={myRating}
+                  onChange={(e) => setMyRating(Number(e.target.value))}
+                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                />
+              </div>
+              <div>
+                <div className="text-xs text-(--subtext)">Comment (optional)</div>
+                <input
+                  value={myComment}
+                  onChange={(e) => setMyComment(e.target.value)}
+                  placeholder="Eventnya bagus..."
+                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={submitReview}
+              className="mt-3 w-full px-4 py-3 rounded-xl text-sm border bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
+            >
+              Submit Review
+            </button>
+            <div className="mt-2 text-xs text-(--subtext)">
+              * Kalau backend kamu mewajibkan event sudah selesai + pernah transaksi DONE, maka submit akan ditolak jika belum memenuhi.
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
