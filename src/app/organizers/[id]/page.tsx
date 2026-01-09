@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, formatIDR } from "@/lib/api";
 
 type Organizer = {
   id: number;
@@ -26,6 +26,19 @@ type ReviewItem = {
 type OrganizerDetail = {
   organizer: Organizer;
   summary: { avgRating: number | null; totalReviews: number };
+  events: {
+    id: number;
+    name: string;
+    category: string;
+    location: string;
+    startAt: string;
+    endAt: string;
+    price: number;
+    remainingSeats: number;
+    imageUrl?: string | null;
+    avgRating: number | null;
+    totalReviews: number;
+  }[];
   reviews: ReviewItem[];
 };
 
@@ -33,6 +46,16 @@ function formatDateID(dateISO: string) {
   const d = new Date(dateISO);
   if (Number.isNaN(d.getTime())) return dateISO;
   return d.toLocaleString("id-ID");
+}
+
+function formatDateShort(dateISO: string) {
+  const d = new Date(dateISO);
+  if (Number.isNaN(d.getTime())) return dateISO;
+  return d.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export default function OrganizerProfilePage() {
@@ -100,7 +123,7 @@ export default function OrganizerProfilePage() {
     );
   }
 
-  const { organizer, summary, reviews } = data;
+  const { organizer, summary, reviews, events } = data;
 
   return (
     <div className="space-y-4">
@@ -154,6 +177,64 @@ export default function OrganizerProfilePage() {
             <div className="mt-1 text-xl font-semibold">{organizer.role}</div>
           </div>
         </div>
+      </div>
+
+      {/* Events */}
+      <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+        <div className="px-6 py-4 border-b border-white/10">
+          <div className="text-lg font-semibold">Events by {organizer.name}</div>
+          <div className="text-sm text-(--subtext)">
+            {events.length} event{events.length === 1 ? "" : "s"} published
+          </div>
+        </div>
+
+        {events.length === 0 ? (
+          <div className="p-6 text-sm text-(--subtext)">Belum ada event.</div>
+        ) : (
+          <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
+            {events.map((event) => (
+              <Link
+                key={event.id}
+                href={`/events/${event.id}`}
+                className="group rounded-2xl border border-white/10 bg-white/5 overflow-hidden transition hover:border-white/20"
+              >
+                {event.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={event.imageUrl}
+                    alt={event.name}
+                    className="h-32 w-full object-cover transition duration-500 group-hover:scale-105"
+                  />
+                ) : (
+                  <div className="h-32 w-full bg-white/5 flex items-center justify-center text-xs text-(--subtext)">
+                    No Image
+                  </div>
+                )}
+
+                <div className="p-4 space-y-2">
+                  <div className="font-semibold">{event.name}</div>
+                  <div className="text-xs text-(--subtext)">
+                    {event.category} • {event.location}
+                  </div>
+                  <div className="text-xs text-(--subtext)">
+                    {formatDateShort(event.startAt)}
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="font-semibold text-white">
+                      {event.price === 0 ? "Free" : formatIDR(event.price)}
+                    </div>
+                    <div className="text-(--subtext)">
+                      {event.avgRating === null
+                        ? "No ratings"
+                        : `${event.avgRating.toFixed(1)} (${event.totalReviews})`}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Reviews */}

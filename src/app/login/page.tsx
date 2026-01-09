@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/lib/auth";
 import { useState } from "react";
+import Link from "next/link";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -41,6 +42,11 @@ export default function LoginPage() {
         >
           Login
         </button>
+        <div className="text-xs text-[var(--subtext)]">
+          <Link href="/forgot-password" className="text-white hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         {err && <div className="text-[var(--accent)]">{err}</div>}
       </div>
     </div>

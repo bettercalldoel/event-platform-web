@@ -271,7 +271,9 @@ export default function OrganizerVouchersPage() {
           </div>
 
           <div className="rounded-xl border border-white/10 bg-white/5 p-3 md:col-span-2">
-            <div className="text-xs text-(--subtext)">Max Uses (kosong = unlimited)</div>
+            <div className="text-xs text-(--subtext)">
+              Voucher Quantity (per ticket, HARAP PERHATIKAN! kosong = unlimited )
+            </div>
             <input
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
@@ -299,7 +301,7 @@ export default function OrganizerVouchersPage() {
         <div className="px-5 py-4 border-b border-white/10">
           <div className="text-lg font-semibold">Vouchers</div>
           <div className="text-sm text-(--subtext) mt-1">
-            usedCount naik saat voucher dipakai. Delete hanya boleh jika usedCount = 0.
+            
           </div>
         </div>
 
@@ -311,7 +313,7 @@ export default function OrganizerVouchersPage() {
               <div className="col-span-3">Code</div>
               <div className="col-span-2">Discount</div>
               <div className="col-span-3">Period</div>
-              <div className="col-span-2">Uses</div>
+              <div className="col-span-2">Uses (tickets)</div>
               <div className="col-span-2 text-right">Action</div>
             </div>
 
@@ -405,7 +407,9 @@ export default function OrganizerVouchersPage() {
               </div>
 
               <div className="rounded-xl border border-white/10 bg-white/5 p-3 md:col-span-2">
-                <div className="text-xs text-(--subtext)">Max Uses (kosong = unlimited)</div>
+                <div className="text-xs text-(--subtext)">
+                  Voucher Quantity (per ticket, kosong = unlimited)
+                </div>
                 <input
                   value={eMaxUses}
                   onChange={(e) => setEMaxUses(e.target.value)}

@@ -73,6 +73,7 @@ export default function EventDetailPage() {
   // checkout
   const [qty, setQty] = useState<number>(1);
   const [voucherCode, setVoucherCode] = useState<string>("");
+  const [couponCode, setCouponCode] = useState<string>("");
   const [pointsUsed, setPointsUsed] = useState<number>(0);
 
   // reviews
@@ -84,9 +85,6 @@ export default function EventDetailPage() {
   });
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
 
-  // create review (optional)
-  const [myRating, setMyRating] = useState<number>(5);
-  const [myComment, setMyComment] = useState<string>("");
 
   const loadEvent = async () => {
     if (!id) return;
@@ -150,6 +148,7 @@ export default function EventDetailPage() {
         qty,
       };
       if (voucherCode.trim()) body.voucherCode = voucherCode.trim();
+      if (couponCode.trim()) body.couponCode = couponCode.trim();
       if (pointsUsed > 0) body.pointsUsed = pointsUsed;
 
       const res = await api(`/transactions`, {
@@ -159,48 +158,13 @@ export default function EventDetailPage() {
       });
 
       const trxId = (res as any)?.transaction?.id;
-      if (trxId) router.push("/transactions");
-      else router.push("/transactions");
+      if (trxId) router.push("/customer");
+      else router.push("/customer");
     } catch (e: any) {
       setErr(e.message);
     }
   };
 
-  const submitReview = async () => {
-    setReviewsErr(null);
-
-    if (!token) {
-      router.push("/login");
-      return;
-    }
-    if (!user || user.role !== "CUSTOMER") {
-      setReviewsErr("Hanya CUSTOMER yang bisa review.");
-      return;
-    }
-
-    const rating = Number(myRating);
-    if (!rating || rating < 1 || rating > 5) {
-      setReviewsErr("Rating harus 1–5");
-      return;
-    }
-
-    try {
-      await api(`/events/${id}/reviews`, {
-        method: "POST",
-        token,
-        body: {
-          rating,
-          comment: myComment.trim() ? myComment.trim() : null,
-        },
-      });
-
-      setMyComment("");
-      setMyRating(5);
-      await loadReviews();
-    } catch (e: any) {
-      setReviewsErr(e.message);
-    }
-  };
 
   if (loading) {
     return (
@@ -286,7 +250,12 @@ export default function EventDetailPage() {
 
             <div className="rounded-xl border border-white/10 bg-white/5 p-3">
               <div className="text-xs text-(--subtext)">Organizer</div>
-              <div className="mt-1 text-sm font-semibold">{data.organizer.name}</div>
+              <Link
+                href={`/organizers/${data.organizer.id}`}
+                className="mt-1 inline-block text-sm font-semibold text-white hover:underline"
+              >
+                {data.organizer.name}
+              </Link>
             </div>
           </div>
         </div>
@@ -320,7 +289,7 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="text-xs text-(--subtext)">Qty</div>
             <input
@@ -339,6 +308,16 @@ export default function EventDetailPage() {
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
               placeholder="PROMO20"
+              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+            />
+          </div>
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-(--subtext)">Voucher from referral</div>
+            <input
+              value={couponCode}
+              onChange={(e) => setCouponCode(e.target.value)}
+              placeholder="REF-XXXX"
               className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
             />
           </div>
@@ -437,44 +416,9 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {/* Create review (optional) */}
-        {user?.role === "CUSTOMER" && (
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-            <div className="font-semibold">Write a review</div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div>
-                <div className="text-xs text-(--subtext)">Rating (1–5)</div>
-                <input
-                  type="number"
-                  min={1}
-                  max={5}
-                  value={myRating}
-                  onChange={(e) => setMyRating(Number(e.target.value))}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
-                />
-              </div>
-              <div>
-                <div className="text-xs text-(--subtext)">Comment (optional)</div>
-                <input
-                  value={myComment}
-                  onChange={(e) => setMyComment(e.target.value)}
-                  placeholder="Eventnya bagus..."
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={submitReview}
-              className="mt-3 w-full px-4 py-3 rounded-xl text-sm border bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
-            >
-              Submit Review
-            </button>
-            <div className="mt-2 text-xs text-(--subtext)">
-              * Kalau backend kamu mewajibkan event sudah selesai + pernah transaksi DONE, maka submit akan ditolak jika belum memenuhi.
-            </div>
-          </div>
-        )}
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-(--subtext)">
+          Write a review from your customer dashboard after the event ends.
+        </div>
       </div>
     </div>
   );

@@ -1,61 +1,63 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// src/lib/api.ts
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.trim() || "http://localhost:4000";
 
-type ApiOpts = {
+type ApiOptions = {
   method?: string;
-  token?: string | null;
   body?: any;
+  token?: string;
   headers?: Record<string, string>;
 };
 
-export async function api<T = any>(path: string, opts: ApiOpts = {}): Promise<T> {
-  const method = opts.method || "GET";
+export async function api<T = any>(path: string, opts: ApiOptions = {}): Promise<T> {
+  const method = opts.method ?? "GET";
 
   const headers: Record<string, string> = {
-    ...(opts.headers || {}),
+    ...(opts.headers ?? {}),
   };
 
-  // Authorization (prevent double "Bearer ")
+  // kalau body bukan FormData, set JSON
+  const isFormData = typeof FormData !== "undefined" && opts.body instanceof FormData;
+
+  if (!isFormData) {
+    headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+  }
+
   if (opts.token) {
-    const raw = opts.token.startsWith("Bearer ") ? opts.token.slice(7) : opts.token;
-    headers["Authorization"] = `Bearer ${raw}`;
+    headers["Authorization"] = `Bearer ${opts.token}`;
   }
 
-  let body: any = undefined;
+  const url = path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
 
-  // if body is FormData, don't set JSON content-type
-  if (opts.body instanceof FormData) {
-    body = opts.body;
-  } else if (opts.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-    body = JSON.stringify(opts.body);
-  }
-
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(url, {
     method,
     headers,
-    body,
+    body: opts.body
+      ? isFormData
+        ? opts.body
+        : JSON.stringify(opts.body)
+      : undefined,
     cache: "no-store",
   });
 
-  const text = await res.text();
-  let json: any = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = { message: text };
-  }
+  // kalau response bukan JSON, lempar text biar kelihatan error HTML
+  const contentType = res.headers.get("content-type") || "";
+  const isJson = contentType.includes("application/json");
+
+  const data = isJson ? await res.json().catch(() => null) : await res.text().catch(() => "");
 
   if (!res.ok) {
-    throw new Error(json?.message || `Request failed (${res.status})`);
+    const msg =
+      (isJson && (data as any)?.message) ||
+      (typeof data === "string" && data) ||
+      `Request failed (${res.status})`;
+    throw new Error(msg);
   }
 
-  return json as T;
+  return data as T;
 }
 
-export function formatIDR(amount: number) {
-  return new Intl.NumberFormat("id-ID", {
-    style: "currency",
-    currency: "IDR",
-    maximumFractionDigits: 0,
-  }).format(amount);
+// helper optional (kalau kamu pakai formatIDR)
+export function formatIDR(n: number) {
+  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(n);
 }

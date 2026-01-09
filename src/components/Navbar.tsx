@@ -56,8 +56,11 @@ export default function Navbar() {
 
           {/* Customer */}
           {user?.role === "CUSTOMER" && (
-            <Link className={navClass(isActive("/transactions"))} href="/transactions">
-              My Transactions
+            <Link
+              className={navClass(isActive("/customer") || pathname === "/transactions")}
+              href="/customer"
+            >
+              Dashboard
             </Link>
           )}
 

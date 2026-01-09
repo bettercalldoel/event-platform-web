@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Trx = {
   id: number;
@@ -33,21 +34,15 @@ type OrgEvent = {
 type MainTab = "transactions" | "events" | "stats";
 type TrxTab = "pending" | "accepted" | "rejected" | "other";
 type EventSort = "NAME_ASC" | "NAME_DESC" | "DATE_ASC" | "DATE_DESC";
+type EventFilter = "upcoming" | "past";
 type StatsGroupBy = "day" | "month" | "year";
 
 type StatsResponse = {
-  groupBy: StatsGroupBy;
-  from: string;
-  to: string;
-  eventId: number | null;
-  summary: {
-    totalTransactions: number;
-    totalTickets: number;
-    totalRevenue: number;
-  };
+  range: StatsGroupBy;
   items: Array<{
-    bucket: string; // ISO date string from backend
-    totalTransactions: number;
+    period: string;
+    eventId: number;
+    eventName: string;
     totalTickets: number;
     totalRevenue: number;
   }>;
@@ -84,26 +79,8 @@ function sortEvents(items: OrgEvent[], sort: EventSort) {
   return arr;
 }
 
-function toDateInputValue(d: Date) {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-function isoFromDateStart(dateStr: string) {
-  // interpret as local date 00:00, then convert to ISO
-  const d = new Date(`${dateStr}T00:00:00`);
-  return d.toISOString();
-}
-
-function isoFromDateEnd(dateStr: string) {
-  const d = new Date(`${dateStr}T23:59:59`);
-  return d.toISOString();
-}
-
-function formatBucket(groupBy: StatsGroupBy, iso: string) {
-  const d = new Date(iso);
+function formatBucket(groupBy: StatsGroupBy, period: string) {
+  const d = new Date(period);
   if (groupBy === "year") return String(d.getFullYear());
   if (groupBy === "month") return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   // day
@@ -120,6 +97,7 @@ export default function OrganizerPage() {
   const [mainTab, setMainTab] = useState<MainTab>("transactions");
   const [trxTab, setTrxTab] = useState<TrxTab>("pending");
   const [eventSort, setEventSort] = useState<EventSort>("DATE_ASC");
+  const [eventFilter, setEventFilter] = useState<EventFilter>("upcoming");
 
   const [trxItems, setTrxItems] = useState<Trx[]>([]);
   const [events, setEvents] = useState<OrgEvent[]>([]);
@@ -129,9 +107,6 @@ export default function OrganizerPage() {
 
   // ===== Stats state =====
   const [statsGroupBy, setStatsGroupBy] = useState<StatsGroupBy>("day");
-  const [statsFrom, setStatsFrom] = useState<string>(() => toDateInputValue(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
-  const [statsTo, setStatsTo] = useState<string>(() => toDateInputValue(new Date()));
-  const [statsEventId, setStatsEventId] = useState<string>(""); // "" = all
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [statsErr, setStatsErr] = useState<string | null>(null);
@@ -163,11 +138,7 @@ export default function OrganizerPage() {
 
     try {
       const params = new URLSearchParams();
-      params.set("groupBy", statsGroupBy);
-
-      if (statsFrom) params.set("from", isoFromDateStart(statsFrom));
-      if (statsTo) params.set("to", isoFromDateEnd(statsTo));
-      if (statsEventId) params.set("eventId", statsEventId);
+      params.set("range", statsGroupBy);
 
       const res = await api<StatsResponse>(`/organizer/stats?${params.toString()}`, { token: authToken });
       setStats(res);
@@ -237,7 +208,7 @@ export default function OrganizerPage() {
     if (mainTab !== "stats") return;
     loadStats();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mainTab, statsGroupBy, statsFrom, statsTo, statsEventId, authToken]);
+  }, [mainTab, statsGroupBy, authToken]);
 
   const grouped = useMemo(() => {
     const pending = trxItems.filter((t) => t.status === "WAITING_FOR_ADMIN_CONFIRMATION");
@@ -261,7 +232,14 @@ export default function OrganizerPage() {
     return grouped.other;
   }, [trxTab, grouped]);
 
-  const visibleEvents = useMemo(() => sortEvents(events, eventSort), [events, eventSort]);
+  const visibleEvents = useMemo(() => {
+    const now = Date.now();
+    const sorted = sortEvents(events, eventSort);
+    if (eventFilter === "past") {
+      return sorted.filter((event) => new Date(event.endAt).getTime() < now);
+    }
+    return sorted.filter((event) => new Date(event.endAt).getTime() >= now);
+  }, [events, eventSort, eventFilter]);
 
   const accept = async (id: number) => {
     if (!authToken) return;
@@ -297,12 +275,39 @@ export default function OrganizerPage() {
     </button>
   );
 
-  // Simple chart derived data
-  const chart = useMemo(() => {
+  const statsSummary = useMemo(() => {
     const items = stats?.items ?? [];
-    const maxRevenue = Math.max(1, ...items.map((x) => x.totalRevenue || 0));
-    return { items, maxRevenue };
+    const totals = items.reduce(
+      (acc, item) => {
+        acc.totalTickets += item.totalTickets || 0;
+        acc.totalRevenue += item.totalRevenue || 0;
+        acc.events.add(item.eventId);
+        return acc;
+      },
+      { totalTickets: 0, totalRevenue: 0, events: new Set<number>() }
+    );
+
+    return {
+      totalTickets: totals.totalTickets,
+      totalRevenue: totals.totalRevenue,
+      totalEvents: totals.events.size,
+    };
   }, [stats]);
+
+  const ticketSummary = useMemo(() => {
+    return events.reduce(
+      (acc, event) => {
+        const total = event.totalSeats || 0;
+        const remaining = event.remainingSeats || 0;
+        acc.totalSeats += total;
+        acc.remainingSeats += remaining;
+        return acc;
+      },
+      { totalSeats: 0, remainingSeats: 0 }
+    );
+  }, [events]);
+
+  const ticketsSold = Math.max(0, ticketSummary.totalSeats - ticketSummary.remainingSeats);
 
   if (loading) return <div className="text-sm text-(--subtext)">Loading…</div>;
 
@@ -312,10 +317,8 @@ export default function OrganizerPage() {
       <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-xl font-semibold">Organizer Dashboard</div>
-            <div className="mt-1 text-sm text-(--subtext)">
-              Transactions + My Events + Stats + Attendees.
-            </div>
+            <div className="text-xl font-semibold">Dashboard</div>
+            <div className="mt-1 text-sm text-(--subtext)">Manage events, sales, and stats.</div>
           </div>
 
           <button
@@ -452,13 +455,28 @@ export default function OrganizerPage() {
       {mainTab === "events" && (
         <div className="space-y-3">
           <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-lg font-semibold">My Events</div>
-                <div className="text-sm text-(--subtext) mt-1">Disortir sesuai pilihan.</div>
-              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold">My Events</div>
+                  <div className="text-sm text-(--subtext) mt-1">Filter upcoming or past events.</div>
+                </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm text-(--subtext)">Filter:</div>
+                <div className="flex items-center gap-2">
+                  <TabButton
+                    active={eventFilter === "upcoming"}
+                    onClick={() => setEventFilter("upcoming")}
+                  >
+                    Upcoming
+                  </TabButton>
+                  <TabButton
+                    active={eventFilter === "past"}
+                    onClick={() => setEventFilter("past")}
+                  >
+                    Past
+                  </TabButton>
+                </div>
                 <div className="text-sm text-(--subtext)">Sort:</div>
                 <select
                   value={eventSort}
@@ -520,6 +538,12 @@ export default function OrganizerPage() {
                     <div className="col-span-2">{e.price === 0 ? "Free" : formatIDR(e.price)}</div>
 
                     <div className="col-span-2 flex justify-end gap-2">
+                      <Link
+                        href={`/organizer/events/${e.id}/vouchers`}
+                        className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
+                      >
+                        Vouchers
+                      </Link>
                       <button
                         onClick={() => openAttendees(e.id)}
                         className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
@@ -542,72 +566,30 @@ export default function OrganizerPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">Statistics</div>
-                <div className="text-sm text-(--subtext) mt-1">
-                  Grafik sederhana (DONE transactions). Bisa group by day/month/year.
-                </div>
+                <div className="text-sm text-(--subtext) mt-1">Summary of DONE sales.</div>
               </div>
 
-              <button
-                onClick={loadStats}
-                disabled={statsLoading || !authToken}
-                className={`px-3 py-2 rounded-xl text-sm border ${
-                  statsLoading || !authToken
-                    ? "bg-white/5 border-white/10 opacity-60 cursor-not-allowed"
-                    : "bg-white/5 hover:bg-white/10 border-white/10"
-                }`}
-              >
-                {statsLoading ? "Loading…" : "Reload Stats"}
-              </button>
-            </div>
-
-            <div className="mt-4 grid gap-3 md:grid-cols-4">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="text-xs text-(--subtext)">Group By</div>
+              <div className="flex items-center gap-2">
                 <select
                   value={statsGroupBy}
                   onChange={(e) => setStatsGroupBy(e.target.value as StatsGroupBy)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-3 py-3 text-sm outline-none"
+                  className="rounded-xl bg-(--muted) border border-white/10 px-3 py-2 text-sm outline-none"
                 >
                   <option value="day">Day</option>
                   <option value="month">Month</option>
                   <option value="year">Year</option>
                 </select>
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="text-xs text-(--subtext)">From</div>
-                <input
-                  type="date"
-                  value={statsFrom}
-                  onChange={(e) => setStatsFrom(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-3 py-3 text-sm outline-none"
-                />
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="text-xs text-(--subtext)">To</div>
-                <input
-                  type="date"
-                  value={statsTo}
-                  onChange={(e) => setStatsTo(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-3 py-3 text-sm outline-none"
-                />
-              </div>
-
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-                <div className="text-xs text-(--subtext)">Event (optional)</div>
-                <select
-                  value={statsEventId}
-                  onChange={(e) => setStatsEventId(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-3 py-3 text-sm outline-none"
+                <button
+                  onClick={loadStats}
+                  disabled={statsLoading || !authToken}
+                  className={`px-3 py-2 rounded-xl text-sm border ${
+                    statsLoading || !authToken
+                      ? "bg-white/5 border-white/10 opacity-60 cursor-not-allowed"
+                      : "bg-white/5 hover:bg-white/10 border-white/10"
+                  }`}
                 >
-                  <option value="">All Events</option>
-                  {events.map((ev) => (
-                    <option key={ev.id} value={String(ev.id)}>
-                      {ev.name}
-                    </option>
-                  ))}
-                </select>
+                  {statsLoading ? "Loading…" : "Reload"}
+                </button>
               </div>
             </div>
 
@@ -618,66 +600,55 @@ export default function OrganizerPage() {
             )}
           </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-4">
             <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
-              <div className="text-xs text-(--subtext)">Total Transactions (DONE)</div>
-              <div className="mt-1 text-2xl font-semibold">{stats?.summary.totalTransactions ?? 0}</div>
+              <div className="text-xs text-(--subtext)">Events with sales</div>
+              <div className="mt-1 text-2xl font-semibold">{statsSummary.totalEvents}</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
-              <div className="text-xs text-(--subtext)">Total Tickets Sold</div>
-              <div className="mt-1 text-2xl font-semibold">{stats?.summary.totalTickets ?? 0}</div>
+              <div className="text-xs text-(--subtext)">Tickets sold</div>
+              <div className="mt-1 text-2xl font-semibold">{ticketsSold}</div>
             </div>
             <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
-              <div className="text-xs text-(--subtext)">Total Revenue</div>
-              <div className="mt-1 text-2xl font-semibold">{formatIDR(stats?.summary.totalRevenue ?? 0)}</div>
+              <div className="text-xs text-(--subtext)">Tickets available</div>
+              <div className="mt-1 text-2xl font-semibold">
+                {ticketSummary.remainingSeats}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+              <div className="text-xs text-(--subtext)">Total revenue</div>
+              <div className="mt-1 text-2xl font-semibold">
+                {formatIDR(statsSummary.totalRevenue)}
+              </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <div className="text-lg font-semibold">Revenue Chart</div>
-                <div className="text-sm text-(--subtext) mt-1">Bar chart sederhana (totalRevenue per bucket).</div>
-              </div>
-              <div className="text-xs text-(--subtext)">
-                {stats ? `${formatBucket(stats.groupBy, stats.from)} → ${formatBucket(stats.groupBy, stats.to)}` : ""}
-              </div>
+          <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+            <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs text-(--subtext) border-b border-white/10">
+              <div className="col-span-3">Period</div>
+              <div className="col-span-5">Event</div>
+              <div className="col-span-2 text-right">Tickets</div>
+              <div className="col-span-2 text-right">Revenue</div>
             </div>
 
             {statsLoading ? (
-              <div className="mt-4 text-sm text-(--subtext)">Loading…</div>
-            ) : !stats || chart.items.length === 0 ? (
-              <div className="mt-4 text-sm text-(--subtext)">Tidak ada data pada range ini.</div>
+              <div className="p-4 text-sm text-(--subtext)">Loading…</div>
+            ) : !stats || stats.items.length === 0 ? (
+              <div className="p-4 text-sm text-(--subtext)">No data yet.</div>
             ) : (
-              <div className="mt-4">
-                <div className="flex items-end gap-2 h-40">
-                  {chart.items.slice(-24).map((it, idx) => {
-                    const h = Math.max(4, Math.round((it.totalRevenue / chart.maxRevenue) * 160));
-                    return (
-                      <div key={idx} className="flex-1 min-w-2.5">
-                        <div
-                          title={`${formatBucket(stats.groupBy, it.bucket)} • ${formatIDR(it.totalRevenue)}`}
-                          className="w-full rounded-lg bg-(--primary)/25 border border-(--primary)/40"
-                          style={{ height: `${h}px` }}
-                        />
-                      </div>
-                    );
-                  })}
+              stats.items.map((item, idx) => (
+                <div
+                  key={`${item.eventId}-${idx}`}
+                  className="grid grid-cols-12 gap-2 px-4 py-3 border-b border-white/10 text-sm"
+                >
+                  <div className="col-span-3 text-(--subtext)">
+                    {formatBucket(statsGroupBy, item.period)}
+                  </div>
+                  <div className="col-span-5">{item.eventName}</div>
+                  <div className="col-span-2 text-right">{item.totalTickets}</div>
+                  <div className="col-span-2 text-right">{formatIDR(item.totalRevenue)}</div>
                 </div>
-
-                <div className="mt-3 grid gap-2 text-xs text-(--subtext)">
-                  {chart.items.slice(-10).map((it, idx) => (
-                    <div key={idx} className="flex items-center justify-between border-t border-white/10 pt-2">
-                      <div>{formatBucket(stats.groupBy, it.bucket)}</div>
-                      <div className="flex gap-4">
-                        <div>Trx: <span className="text-white">{it.totalTransactions}</span></div>
-                        <div>Tickets: <span className="text-white">{it.totalTickets}</span></div>
-                        <div>Revenue: <span className="text-white">{formatIDR(it.totalRevenue)}</span></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              ))
             )}
           </div>
         </div>
