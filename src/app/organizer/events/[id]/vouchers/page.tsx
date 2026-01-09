@@ -191,7 +191,7 @@ export default function OrganizerVouchersPage() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
+      <div className="ui-card p-6 text-sm text-(--subtext)">
         Loading…
       </div>
     );
@@ -199,7 +199,7 @@ export default function OrganizerVouchersPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-2xl font-semibold">Manage Vouchers</div>
@@ -225,52 +225,52 @@ export default function OrganizerVouchersPage() {
       </div>
 
       {/* CREATE */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-3">
+      <div className="ui-card space-y-3">
         <div className="text-lg font-semibold">Create Voucher</div>
 
         <div className="grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Code</div>
             <input
               value={code}
               onChange={(e) => setCode(e.target.value)}
               placeholder="PROMO20"
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Discount Amount (IDR)</div>
             <input
               type="number"
               min={1}
               value={discountAmount}
               onChange={(e) => setDiscountAmount(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Start At</div>
             <input
               type="datetime-local"
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">End At</div>
             <input
               type="datetime-local"
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3 md:col-span-2">
+          <div className="ui-panel p-3 md:col-span-2">
             <div className="text-xs text-(--subtext)">
               Voucher Quantity (per ticket, HARAP PERHATIKAN! kosong = unlimited )
             </div>
@@ -278,7 +278,7 @@ export default function OrganizerVouchersPage() {
               value={maxUses}
               onChange={(e) => setMaxUses(e.target.value)}
               placeholder="15"
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
         </div>
@@ -297,7 +297,7 @@ export default function OrganizerVouchersPage() {
       </div>
 
       {/* LIST */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+      <div className="ui-card overflow-hidden">
         <div className="px-5 py-4 border-b border-white/10">
           <div className="text-lg font-semibold">Vouchers</div>
           <div className="text-sm text-(--subtext) mt-1">
@@ -351,7 +351,7 @@ export default function OrganizerVouchersPage() {
       {/* EDIT MODAL SIMPLE */}
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-3">
+          <div className="w-full max-w-2xl ui-card p-6 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-xl font-semibold">Edit Voucher</div>
@@ -366,54 +366,54 @@ export default function OrganizerVouchersPage() {
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="ui-panel p-3">
                 <div className="text-xs text-(--subtext)">Code</div>
                 <input
                   value={eCode}
                   onChange={(e) => setECode(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                  className="ui-input mt-2"
                 />
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="ui-panel p-3">
                 <div className="text-xs text-(--subtext)">Discount Amount (IDR)</div>
                 <input
                   type="number"
                   min={1}
                   value={eDiscountAmount}
                   onChange={(e) => setEDiscountAmount(Number(e.target.value))}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                  className="ui-input mt-2"
                 />
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="ui-panel p-3">
                 <div className="text-xs text-(--subtext)">Start At</div>
                 <input
                   type="datetime-local"
                   value={eStartAt}
                   onChange={(e) => setEStartAt(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                  className="ui-input mt-2"
                 />
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+              <div className="ui-panel p-3">
                 <div className="text-xs text-(--subtext)">End At</div>
                 <input
                   type="datetime-local"
                   value={eEndAt}
                   onChange={(e) => setEEndAt(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                  className="ui-input mt-2"
                 />
               </div>
 
-              <div className="rounded-xl border border-white/10 bg-white/5 p-3 md:col-span-2">
+              <div className="ui-panel p-3 md:col-span-2">
                 <div className="text-xs text-(--subtext)">
                   Voucher Quantity (per ticket, kosong = unlimited)
                 </div>
                 <input
                   value={eMaxUses}
                   onChange={(e) => setEMaxUses(e.target.value)}
-                  className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+                  className="ui-input mt-2"
                 />
               </div>
             </div>

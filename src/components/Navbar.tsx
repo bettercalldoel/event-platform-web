@@ -6,10 +6,10 @@ import { useAuth } from "@/lib/auth";
 
 function navClass(active: boolean) {
   return [
-    "px-3 py-2 rounded-lg text-sm border transition",
+    "px-3 py-2 rounded-lg text-sm border font-medium transition",
     active
-      ? "bg-(--primary)/25 border-(--primary)/40"
-      : "bg-white/5 border-white/10 hover:bg-white/10",
+      ? "bg-(--primary)/25 border-(--primary)/40 text-white"
+      : "bg-white/5 border-white/10 text-white/80 hover:bg-white/10 hover:text-white",
   ].join(" ");
 }
 
@@ -23,10 +23,10 @@ export default function Navbar() {
   };
 
   return (
-    <div className="sticky top-0 z-20 backdrop-blur border-b border-white/10">
-      <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
+    <div className="sticky top-0 z-20 border-b border-white/10 bg-[#0b1220]/70 backdrop-blur shadow-[0_16px_36px_-28px_rgba(2,6,23,0.95)]">
+      <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-3">
         {/* Brand */}
-        <Link href="/" className="font-semibold tracking-wide select-none">
+        <Link href="/" className="text-lg font-semibold tracking-wide select-none">
           <span className="text-(--primary)">Aqua</span>
           <span className="text-white">Event</span>
         </Link>

@@ -13,31 +13,46 @@ export default function RegisterPage() {
   const [err, setErr] = useState<string | null>(null);
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-[var(--surface)] p-6">
+    <div className="mx-auto max-w-md ui-card p-6">
       <div className="text-xl font-semibold">Register</div>
       <div className="mt-1 text-sm text-[var(--subtext)]">Buat akun customer atau organizer.</div>
 
       <div className="mt-4 space-y-3 text-sm">
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name"
-          className="w-full rounded-xl bg-[var(--muted)] border border-white/10 px-4 py-3 outline-none" />
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email"
-          className="w-full rounded-xl bg-[var(--muted)] border border-white/10 px-4 py-3 outline-none" />
-        <input value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6)"
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Name"
+          className="ui-input"
+        />
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          className="ui-input"
+        />
+        <input
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Password (min 6)"
           type="password"
-          className="w-full rounded-xl bg-[var(--muted)] border border-white/10 px-4 py-3 outline-none" />
+          className="ui-input"
+        />
 
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as any)}
-          className="w-full rounded-xl bg-[var(--muted)] border border-white/10 px-4 py-3 outline-none"
+          className="ui-input"
         >
           <option value="CUSTOMER">Customer</option>
           <option value="ORGANIZER">Organizer</option>
         </select>
 
-        <input value={referralCodeUsed} onChange={(e) => setReferral(e.target.value)}
+        <input
+          value={referralCodeUsed}
+          onChange={(e) => setReferral(e.target.value)}
           placeholder="Referral code (optional)"
-          className="w-full rounded-xl bg-[var(--muted)] border border-white/10 px-4 py-3 outline-none" />
+          className="ui-input"
+        />
 
         <button
           onClick={async () => {
@@ -48,7 +63,7 @@ export default function RegisterPage() {
               setErr(e.message);
             }
           }}
-          className="w-full rounded-xl px-4 py-3 bg-[var(--primary)]/25 hover:bg-[var(--primary)]/35 border border-[var(--primary)]/40"
+          className="w-full ui-btn ui-btn-primary"
         >
           Register
         </button>

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { EVENT_CATEGORIES } from "@/lib/constants";
 
 type OrgEventDetail = {
   id: number;
@@ -213,7 +214,7 @@ export default function OrganizerEditEventPage() {
 
   if (busy) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
+      <div className="ui-card p-6 text-sm text-(--subtext)">
         Loading event…
       </div>
     );
@@ -221,7 +222,7 @@ export default function OrganizerEditEventPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-2xl font-semibold">Edit Event</div>
@@ -291,89 +292,102 @@ export default function OrganizerEditEventPage() {
 
         {/* Form */}
         <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Name</div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Category</div>
-            <input
-              value={category}
+            <select
+              value={
+                EVENT_CATEGORIES.find(
+                  (item) => item.toLowerCase() === category.toLowerCase()
+                ) ?? ""
+              }
               onChange={(e) => setCategory(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
-            />
+              className="ui-input mt-2"
+            >
+              <option value="" disabled>
+                Select category
+              </option>
+              {EVENT_CATEGORIES.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Location</div>
             <input
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Price (IDR)</div>
             <input
               type="number"
               min={0}
               value={price}
               onChange={(e) => setPrice(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Start At</div>
             <input
               type="datetime-local"
               value={startAt}
               onChange={(e) => setStartAt(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">End At</div>
             <input
               type="datetime-local"
               value={endAt}
               onChange={(e) => setEndAt(e.target.value)}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3 md:col-span-2">
+          <div className="ui-panel p-3 md:col-span-2">
             <div className="text-xs text-(--subtext)">Description</div>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Total Seats</div>
             <input
               type="number"
               min={1}
               value={totalSeats}
               onChange={(e) => setTotalSeats(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none"
+              className="ui-input mt-2"
             />
             <div className="text-xs text-(--subtext) mt-1">
               Note: tidak boleh lebih kecil dari seats yang sudah terpakai.
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3 flex items-center justify-between">
+          <div className="ui-panel p-3 flex items-center justify-between">
             <div>
               <div className="text-xs text-(--subtext)">Publish</div>
               <div className="text-sm">Tampilkan di landing page</div>

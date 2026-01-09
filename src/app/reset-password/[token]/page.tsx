@@ -51,7 +51,7 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="mx-auto max-w-md rounded-2xl border border-white/10 bg-(--surface) p-6">
+    <div className="mx-auto max-w-md ui-card p-6">
       <div className="text-xl font-semibold">Reset Password</div>
       <div className="mt-1 text-sm text-(--subtext)">
         Create a new password for your account.
@@ -63,22 +63,22 @@ export default function ResetPasswordPage() {
           onChange={(e) => setPassword(e.target.value)}
           placeholder="New password"
           type="password"
-          className="w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 outline-none"
+          className="ui-input"
         />
         <input
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           placeholder="Confirm new password"
           type="password"
-          className="w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 outline-none"
+          className="ui-input"
         />
         <button
           onClick={submit}
           disabled={loading}
-          className={`w-full rounded-xl px-4 py-3 border ${
+          className={`w-full ui-btn ${
             loading
-              ? "bg-white/5 border-white/10 text-(--subtext) cursor-not-allowed"
-              : "bg-(--primary)/25 hover:bg-(--primary)/35 border-(--primary)/40"
+              ? "ui-btn-muted text-(--subtext) cursor-not-allowed"
+              : "ui-btn-primary"
           }`}
         >
           {loading ? "Updating..." : "Reset Password"}

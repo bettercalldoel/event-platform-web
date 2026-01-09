@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useRouter } from "next/navigation";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, formatIDR } from "@/lib/api";
+import { EVENT_CATEGORIES } from "@/lib/constants";
 
 type EventItem = {
   id: number;
@@ -19,13 +19,10 @@ type EventItem = {
   organizer: { id: number; name: string };
 };
 
-const displayFont = Fraunces({ subsets: ["latin"], weight: ["600", "700"] });
-const bodyFont = Plus_Jakarta_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-const PAGE_SIZE = 9;
-const PAST_LIMIT = 6;
+const DESKTOP_PAGE_SIZE = 6;
+const MOBILE_PAGE_SIZE = 3;
+const DESKTOP_PAST_LIMIT = 3;
+const MOBILE_PAST_LIMIT = 3;
 
 function useDebounce<T>(value: T, delay = 400) {
   const [v, setV] = useState(value);
@@ -38,6 +35,8 @@ function useDebounce<T>(value: T, delay = 400) {
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchKey = useMemo(() => searchParams.toString(), [searchParams]);
 
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -52,6 +51,8 @@ export default function HomePage() {
   const [pastLoading, setPastLoading] = useState(true);
   const [pastErr, setPastErr] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DESKTOP_PAGE_SIZE);
+  const [pastLimit, setPastLimit] = useState(DESKTOP_PAST_LIMIT);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const [showFilters, setShowFilters] = useState(false);
@@ -68,17 +69,17 @@ export default function HomePage() {
     const params = new URLSearchParams(baseQueryString);
     params.set("time", "upcoming");
     params.set("page", String(page));
-    params.set("limit", String(PAGE_SIZE));
+    params.set("limit", String(pageSize));
     return params.toString();
-  }, [baseQueryString, page]);
+  }, [baseQueryString, page, pageSize]);
 
   const pastQueryString = useMemo(() => {
     const params = new URLSearchParams(baseQueryString);
     params.set("time", "past");
     params.set("page", "1");
-    params.set("limit", String(PAST_LIMIT));
+    params.set("limit", String(pastLimit));
     return params.toString();
-  }, [baseQueryString]);
+  }, [baseQueryString, pastLimit]);
 
   useEffect(() => {
     setLoading(true);
@@ -107,6 +108,58 @@ export default function HomePage() {
       .finally(() => setPastLoading(false));
   }, [upcomingQueryString, pastQueryString]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const media = window.matchMedia("(max-width: 768px)");
+    const update = () => {
+      const next = media.matches ? MOBILE_PAGE_SIZE : DESKTOP_PAGE_SIZE;
+      const nextPast = media.matches ? MOBILE_PAST_LIMIT : DESKTOP_PAST_LIMIT;
+      setPageSize(next);
+      setPastLimit(nextPast);
+      setPage(1);
+    };
+    update();
+    if (media.addEventListener) {
+      media.addEventListener("change", update);
+      return () => media.removeEventListener("change", update);
+    }
+    media.addListener(update);
+    return () => media.removeListener(update);
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchKey);
+    const nextQ = params.get("q") ?? "";
+    const rawCategory = params.get("category") ?? "";
+    const nextCategory =
+      rawCategory.trim().length === 0
+        ? ""
+        : EVENT_CATEGORIES.find(
+            (item) => item.toLowerCase() === rawCategory.toLowerCase()
+          ) ?? "";
+    const nextLocation = params.get("location") ?? "";
+    const pageRaw = Number(params.get("page") ?? "1");
+    const nextPage = Number.isNaN(pageRaw) || pageRaw < 1 ? 1 : pageRaw;
+
+    setQ((prev) => (prev === nextQ ? prev : nextQ));
+    setCategory((prev) => (prev === nextCategory ? prev : nextCategory));
+    setLocation((prev) => (prev === nextLocation ? prev : nextLocation));
+    setPage((prev) => (prev === nextPage ? prev : nextPage));
+  }, [searchKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (q.trim()) params.set("q", q.trim());
+    if (category.trim()) params.set("category", category.trim());
+    if (location.trim()) params.set("location", location.trim());
+    if (page > 1) params.set("page", String(page));
+
+    const next = params.toString();
+    if (next !== searchKey) {
+      router.replace(next ? `/?${next}` : "/", { scroll: false });
+    }
+  }, [q, category, location, page, router, searchKey]);
+
   const activeFilters = useMemo(() => {
     const filters: { label: string; value: string }[] = [];
     if (dq.trim()) filters.push({ label: "Search", value: dq.trim() });
@@ -128,7 +181,6 @@ export default function HomePage() {
   );
 
   const featured = items[0];
-  const heroTags = ["Live music", "Tech talks", "Pop-up markets", "Art + design"];
   const cardDelay = (index: number): CSSProperties => ({
     animationDelay: `${index * 70}ms`,
   });
@@ -172,9 +224,13 @@ export default function HomePage() {
       style={cardDelay(index)}
     >
       <div className="relative overflow-hidden rounded-xl">
-        <div className="absolute left-2 top-2 rounded-full bg-black/40 px-2 py-1 text-[10px] uppercase tracking-widest text-white/70">
+        <Link
+          href={`/?category=${encodeURIComponent(event.category)}`}
+          onClick={(ev) => ev.stopPropagation()}
+          className="absolute left-2 top-2 rounded-full bg-black/40 px-2 py-1 text-[10px] uppercase tracking-widest text-white/70 transition hover:bg-black/60"
+        >
           {event.category}
-        </div>
+        </Link>
         {event.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -219,7 +275,7 @@ export default function HomePage() {
   );
 
   return (
-    <div className={`${bodyFont.className} space-y-6`}>
+    <div className="space-y-6">
       <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top_left,rgba(45,212,191,0.35),transparent_45%),radial-gradient(circle_at_top_right,rgba(251,146,60,0.28),transparent_45%),linear-gradient(140deg,rgba(15,23,42,0.98),rgba(2,6,23,0.95))] p-6 md:p-8">
         <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-[radial-gradient(circle,rgba(34,211,238,0.55),transparent_70%)] blur-2xl" />
         <div className="pointer-events-none absolute -bottom-28 -left-20 h-64 w-64 rounded-full bg-[radial-gradient(circle,rgba(251,113,133,0.5),transparent_70%)] blur-2xl" />
@@ -230,9 +286,7 @@ export default function HomePage() {
               <span className="h-2 w-2 rounded-full bg-emerald-300"></span>
               Fresh events every week
             </div>
-            <h1
-              className={`${displayFont.className} text-3xl leading-[1.05] text-white sm:text-4xl md:text-5xl`}
-            >
+            <h1 className="font-display text-3xl leading-[1.05] text-white sm:text-4xl md:text-5xl">
               Discover moments that feel{" "}
               <span className="text-amber-200">worth the ride</span>
             </h1>
@@ -284,7 +338,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={resetFilters}
-                      className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/60 transition hover:bg-white/15"
+                      className="ui-panel px-3 py-2 text-xs text-white/60 transition hover:bg-white/15"
                     >
                       Clear
                     </button>
@@ -298,15 +352,21 @@ export default function HomePage() {
                     <span className="text-[11px] uppercase tracking-widest">
                       Category
                     </span>
-                    <input
+                    <select
                       value={category}
                       onChange={(e) => {
                         setCategory(e.target.value);
                         setPage(1);
                       }}
-                      placeholder="Tech, music, art"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-amber-300/60"
-                    />
+                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-amber-300/60"
+                    >
+                      <option value="">All categories</option>
+                      {EVENT_CATEGORIES.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
                   </label>
                   <label className="space-y-1 text-xs text-white/70">
                     <span className="text-[11px] uppercase tracking-widest">
@@ -319,7 +379,7 @@ export default function HomePage() {
                         setPage(1);
                       }}
                       placeholder="Jakarta, Bali"
-                      className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-sky-300/60"
+                      className="w-full ui-panel px-3 py-2 text-xs text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-sky-300/60"
                     />
                   </label>
                 </div>
@@ -358,10 +418,14 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-wrap gap-2 text-xs text-white/70">
-              {heroTags.map((tag) => (
-                <span key={tag} className="rounded-full bg-white/10 px-3 py-1">
+              {EVENT_CATEGORIES.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/?category=${encodeURIComponent(tag)}`}
+                  className="rounded-full bg-white/10 px-3 py-1 transition hover:bg-white/20"
+                >
                   {tag}
-                </span>
+                </Link>
               ))}
             </div>
           </div>
@@ -420,7 +484,7 @@ export default function HomePage() {
                   <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">
                     Events live
                   </div>
-                  <div className={`${displayFont.className} text-lg text-white`}>
+                  <div className="font-display text-lg text-white">
                     {loading ? "..." : totalItems.toLocaleString("id-ID")}
                   </div>
                 </div>
@@ -428,7 +492,7 @@ export default function HomePage() {
                   <div className="text-[11px] uppercase tracking-[0.2em] text-white/60">
                     Seats in view
                   </div>
-                  <div className={`${displayFont.className} text-lg text-white`}>
+                  <div className="font-display text-lg text-white">
                     {loading ? "..." : seatsLeft.toLocaleString("id-ID")}
                   </div>
                 </div>
@@ -447,7 +511,7 @@ export default function HomePage() {
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className={`${displayFont.className} text-xl text-white sm:text-2xl`}>
+            <div className="font-display text-xl text-white sm:text-2xl">
               Upcoming events
             </div>
             <div className="text-xs text-(--subtext)">
@@ -476,7 +540,7 @@ export default function HomePage() {
 
         {loading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: PAGE_SIZE }).map((_, index) => (
+            {Array.from({ length: pageSize }).map((_, index) => (
               <div
                 key={`skeleton-${index}`}
                 className="animate-fade-up rounded-2xl border border-white/10 bg-white/5 p-3"
@@ -492,8 +556,8 @@ export default function HomePage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-8 text-center">
-            <div className={`${displayFont.className} text-lg text-white`}>
+          <div className="ui-card p-8 text-center">
+            <div className="font-display text-lg text-white">
               No events found
             </div>
             <div className="mt-1 text-sm text-(--subtext)">
@@ -559,7 +623,7 @@ export default function HomePage() {
       <section className="space-y-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <div className={`${displayFont.className} text-xl text-white sm:text-2xl`}>
+            <div className="font-display text-xl text-white sm:text-2xl">
               Previous Event
             </div>
             <div className="text-xs text-(--subtext)">
@@ -579,7 +643,7 @@ export default function HomePage() {
 
         {pastLoading ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: PAST_LIMIT }).map((_, index) => (
+            {Array.from({ length: pastLimit }).map((_, index) => (
               <div
                 key={`past-skeleton-${index}`}
                 className="animate-fade-up rounded-2xl border border-white/10 bg-white/5 p-3"
@@ -595,8 +659,8 @@ export default function HomePage() {
             ))}
           </div>
         ) : pastItems.length === 0 ? (
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-8 text-center">
-            <div className={`${displayFont.className} text-lg text-white`}>
+          <div className="ui-card p-8 text-center">
+            <div className="font-display text-lg text-white">
               No previous events
             </div>
             <div className="mt-1 text-sm text-(--subtext)">

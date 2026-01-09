@@ -74,6 +74,7 @@ export default function EventDetailPage() {
   const [qty, setQty] = useState<number>(1);
   const [voucherCode, setVoucherCode] = useState<string>("");
   const [couponCode, setCouponCode] = useState<string>("");
+  const [extraVoucherOpen, setExtraVoucherOpen] = useState(false);
   const [pointsUsed, setPointsUsed] = useState<number>(0);
 
   // reviews
@@ -168,7 +169,7 @@ export default function EventDetailPage() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
+      <div className="ui-card p-6 text-sm text-(--subtext)">
         Loading event…
       </div>
     );
@@ -192,7 +193,7 @@ export default function EventDetailPage() {
 
   if (!data) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm">
+      <div className="ui-card p-6 text-sm">
         Event not found
       </div>
     );
@@ -201,7 +202,7 @@ export default function EventDetailPage() {
   return (
     <div className="space-y-4">
       {/* HERO */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+      <div className="ui-card overflow-hidden">
         {data.imageUrl ? (
           <img src={data.imageUrl} alt={data.name} className="h-56 w-full object-cover" />
         ) : (
@@ -215,7 +216,13 @@ export default function EventDetailPage() {
             <div>
               <div className="text-2xl font-semibold">{data.name}</div>
               <div className="mt-1 text-sm text-(--subtext)">
-                {data.category} • {data.location}
+                <Link
+                  href={`/?category=${encodeURIComponent(data.category)}`}
+                  className="text-white/80 hover:text-white hover:underline"
+                >
+                  {data.category}
+                </Link>{" "}
+                • {data.location}
               </div>
             </div>
 
@@ -232,7 +239,7 @@ export default function EventDetailPage() {
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="ui-panel p-3">
               <div className="text-xs text-(--subtext)">Schedule</div>
               <div className="mt-1 text-sm">
                 {new Date(data.startAt).toLocaleString("id-ID")} —{" "}
@@ -240,7 +247,7 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="ui-panel p-3">
               <div className="text-xs text-(--subtext)">Seats</div>
               <div className="mt-1 text-sm">
                 Remaining <span className="font-semibold">{data.remainingSeats}</span> /{" "}
@@ -248,7 +255,7 @@ export default function EventDetailPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="ui-panel p-3">
               <div className="text-xs text-(--subtext)">Organizer</div>
               <Link
                 href={`/organizers/${data.organizer.id}`}
@@ -262,7 +269,7 @@ export default function EventDetailPage() {
       </div>
 
       {/* CHECKOUT */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-lg font-semibold">Checkout</div>
@@ -289,8 +296,8 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Qty</div>
             <input
               type="number"
@@ -298,31 +305,23 @@ export default function EventDetailPage() {
               max={data.remainingSeats}
               value={qty}
               onChange={(e) => setQty(Number(e.target.value))}
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-xs text-(--subtext)">Voucher (optional)</div>
+          <div className="ui-panel p-3">
+            <div className="text-xs text-(--subtext)">
+              Event voucher code (optional)
+            </div>
             <input
               value={voucherCode}
               onChange={(e) => setVoucherCode(e.target.value)}
               placeholder="PROMO20"
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
 
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
-            <div className="text-xs text-(--subtext)">Voucher from referral</div>
-            <input
-              value={couponCode}
-              onChange={(e) => setCouponCode(e.target.value)}
-              placeholder="REF-XXXX"
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
-            />
-          </div>
-
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+          <div className="ui-panel p-3">
             <div className="text-xs text-(--subtext)">Points used (optional)</div>
             <input
               type="number"
@@ -330,9 +329,51 @@ export default function EventDetailPage() {
               value={pointsUsed}
               onChange={(e) => setPointsUsed(Number(e.target.value))}
               placeholder="5000"
-              className="mt-2 w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-(--ring)"
+              className="ui-input mt-2"
             />
           </div>
+
+          {extraVoucherOpen && (
+            <div className="ui-panel p-3">
+              <div className="text-xs text-(--subtext)">
+                Referral voucher code (optional)
+              </div>
+              <input
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="REF-XXXX"
+                className="ui-input mt-2"
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3">
+          {extraVoucherOpen ? (
+            <button
+              type="button"
+              onClick={() => {
+                setExtraVoucherOpen(false);
+                setCouponCode("");
+              }}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs"
+            >
+              Remove extra voucher
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setExtraVoucherOpen(true)}
+              className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs"
+            >
+              Add another voucher
+            </button>
+          )}
+        </div>
+
+        <div className="mt-2 text-xs text-(--subtext)">
+          Event vouchers are created by the organizer. Referral vouchers come from
+          another user’s referral code.
         </div>
 
         <button
@@ -366,7 +407,7 @@ export default function EventDetailPage() {
       </div>
 
       {/* REVIEWS */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-4">
+      <div className="ui-card p-6 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-lg font-semibold">Reviews</div>
@@ -400,7 +441,7 @@ export default function EventDetailPage() {
         ) : (
           <div className="space-y-3">
             {reviewItems.map((r) => (
-              <div key={r.id} className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div key={r.id} className="ui-panel p-4">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold">{r.user.name}</div>
                   <div className="text-xs text-(--subtext)">
@@ -416,7 +457,7 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-(--subtext)">
+        <div className="ui-panel p-4 text-sm text-(--subtext)">
           Write a review from your customer dashboard after the event ends.
         </div>
       </div>

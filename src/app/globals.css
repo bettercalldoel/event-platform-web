@@ -2,21 +2,141 @@
 
 :root{
   --bg: #0b1220;
-  --surface: #0f1b2d;
-  --muted: #13233a;
+  --surface: #0f1a2e;
+  --surface-strong: #14243f;
+  --muted: #132642;
   --text: #e6f0ff;
   --subtext: #a9bddb;
 
   --primary: #2dd4bf;
   --accent: #fb7185;
-  --ring: rgba(45, 212, 191, 0.45);
+  --ring: rgba(45, 212, 191, 0.5);
+  --border: rgba(148, 163, 184, 0.16);
+
+  --shadow-soft: 0 20px 45px -28px rgba(2, 6, 23, 0.85);
+  --shadow-card: 0 20px 48px -30px rgba(15, 23, 42, 0.85);
 }
 
 body{
-  background: radial-gradient(900px 500px at 20% 10%, rgba(45,212,191,0.12), transparent 50%),
-              radial-gradient(900px 500px at 80% 0%, rgba(251,113,133,0.10), transparent 50%),
+  background: radial-gradient(880px 520px at 18% 12%, rgba(45,212,191,0.14), transparent 52%),
+              radial-gradient(900px 540px at 82% 0%, rgba(251,113,133,0.12), transparent 55%),
+              radial-gradient(620px 420px at 50% 85%, rgba(14, 116, 144, 0.12), transparent 60%),
               var(--bg);
   color: var(--text);
+  font-family: var(--font-body), "Segoe UI", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+.font-display{
+  font-family: var(--font-display), var(--font-body), "Times New Roman", serif;
+}
+
+::selection{
+  background: rgba(45, 212, 191, 0.2);
+}
+
+input,
+select,
+textarea{
+  color: var(--text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+input::placeholder,
+textarea::placeholder{
+  color: rgba(169, 189, 219, 0.6);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible{
+  border-color: rgba(45, 212, 191, 0.6);
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+button{
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+button:active{
+  transform: translateY(1px);
+}
+
+.ui-card{
+  border-radius: 1.25rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.ui-card-strong{
+  background: var(--surface-strong);
+}
+
+.ui-panel{
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ui-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ui-btn:hover{
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ui-btn-primary{
+  background: rgba(45, 212, 191, 0.25);
+  border-color: rgba(45, 212, 191, 0.4);
+}
+
+.ui-btn-primary:hover{
+  background: rgba(45, 212, 191, 0.35);
+}
+
+.ui-btn-accent{
+  background: rgba(251, 113, 133, 0.2);
+  border-color: rgba(251, 113, 133, 0.4);
+}
+
+.ui-btn-accent:hover{
+  background: rgba(251, 113, 133, 0.3);
+}
+
+.ui-btn-muted{
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ui-input{
+  width: 100%;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border);
+  background: var(--muted);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+}
+
+.ui-input-compact{
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
 }
 
 @keyframes fade-up{

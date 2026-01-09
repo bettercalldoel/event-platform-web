@@ -61,7 +61,7 @@ export default function AttendeesPage() {
 
   if (busy) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
+      <div className="ui-card p-6 text-sm text-(--subtext)">
         Loading attendees…
       </div>
     );
@@ -82,7 +82,7 @@ export default function AttendeesPage() {
 
   if (!data) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm">
+      <div className="ui-card p-6 text-sm">
         Not found
       </div>
     );
@@ -90,7 +90,7 @@ export default function AttendeesPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xl font-semibold">Attendees</div>
@@ -108,7 +108,7 @@ export default function AttendeesPage() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+      <div className="ui-card overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs text-(--subtext) border-b border-white/10">
           <div className="col-span-6">Customer</div>
           <div className="col-span-2">Qty</div>

@@ -357,7 +357,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
 
   if (!user) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="text-xl font-semibold">Customer Dashboard</div>
         <div className="mt-2 text-sm text-(--subtext)">Login dulu untuk melihat dashboard.</div>
         <Link
@@ -372,7 +372,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
 
   if (user.role !== "CUSTOMER") {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="text-xl font-semibold">Customer Dashboard</div>
         <div className="mt-2 text-sm text-(--subtext)">Akun kamu adalah organizer.</div>
         <Link
@@ -395,7 +395,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
         onChange={onFileChange}
       />
 
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+      <div className="ui-card p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xl font-semibold">Customer Dashboard</div>
@@ -435,7 +435,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
       </div>
 
       {tab === "transactions" && (
-        <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-4">
+        <div className="ui-card p-6 space-y-4">
           {items.length === 0 ? (
             <div className="text-center">
               <div className="font-semibold">Belum ada transaksi</div>
@@ -444,7 +444,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
           ) : (
             <div className="grid gap-3">
               {items.map((t) => (
-                <div key={t.id} className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+                <div key={t.id} className="ui-card p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold">{t.event.name}</div>
@@ -506,7 +506,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
       )}
 
       {tab === "attended" && (
-        <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+        <div className="ui-card p-6">
           {attErr && (
             <div className="mb-4 rounded-xl border border-(--accent)/40 bg-(--accent)/10 p-3 text-sm">
               {attErr}
@@ -621,7 +621,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
                                     [event.id]: Number(e.target.value),
                                   }))
                                 }
-                                className="mt-1 w-full rounded-lg bg-(--muted) border border-white/10 px-3 py-2 text-xs outline-none"
+                                className="ui-input ui-input-compact mt-1"
                               >
                                 {[5, 4, 3, 2, 1].map((value) => (
                                   <option key={value} value={value}>
@@ -641,7 +641,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
                                   }))
                                 }
                                 rows={3}
-                                className="mt-1 w-full rounded-lg bg-(--muted) border border-white/10 px-3 py-2 text-xs outline-none"
+                                className="ui-input ui-input-compact mt-1"
                                 placeholder="Share your experience..."
                               />
                             </div>
@@ -676,7 +676,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
 
       {tab === "account" && (
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-3">
+          <div className="ui-card p-6 space-y-3">
             <div>
               <div className="text-lg font-semibold">Referral</div>
               <div className="text-sm text-(--subtext) mt-1">
@@ -690,7 +690,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
               </div>
             )}
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+            <div className="ui-panel p-4 space-y-2">
               <div className="text-xs text-(--subtext)">Your referral code</div>
               <div className="flex items-center justify-between gap-2">
                 <div className="text-lg font-semibold">
@@ -707,14 +707,14 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
               {copyMsg && <div className="text-xs text-emerald-200">{copyMsg}</div>}
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+            <div className="ui-panel p-4">
               <div className="text-xs text-(--subtext)">Referral points earned</div>
               <div className="mt-1 text-xl font-semibold">
                 {referralLoading ? "..." : referral?.referralPoints ?? 0}
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-2">
+            <div className="ui-panel p-4 space-y-2">
               <div className="text-xs text-(--subtext)">Your vouchers</div>
               {couponErr && <div className="text-(--accent) text-xs">{couponErr}</div>}
               {couponLoading ? (
@@ -744,7 +744,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 space-y-3">
+          <div className="ui-card p-6 space-y-3">
             <div>
               <div className="text-lg font-semibold">Change Password</div>
               <div className="text-sm text-(--subtext) mt-1">
@@ -758,21 +758,21 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="Current password"
                 type="password"
-                className="w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 outline-none"
+                className="ui-input"
               />
               <input
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="New password"
                 type="password"
-                className="w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 outline-none"
+                className="ui-input"
               />
               <input
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
                 type="password"
-                className="w-full rounded-xl bg-(--muted) border border-white/10 px-4 py-3 outline-none"
+                className="ui-input"
               />
             </div>
 
@@ -783,10 +783,10 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
               type="button"
               onClick={changePassword}
               disabled={pwLoading}
-              className={`w-full rounded-xl px-4 py-3 text-sm border ${
+              className={`w-full ui-btn ${
                 pwLoading
-                  ? "bg-white/5 border-white/10 text-(--subtext) cursor-not-allowed"
-                  : "bg-(--primary)/20 hover:bg-(--primary)/30 border-(--primary)/40"
+                  ? "ui-btn-muted text-(--subtext) cursor-not-allowed"
+                  : "ui-btn-primary"
               }`}
             >
               {pwLoading ? "Updating..." : "Update Password"}

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { api, formatIDR } from "@/lib/api";
 
 type Organizer = {
@@ -60,6 +60,7 @@ function formatDateShort(dateISO: string) {
 
 export default function OrganizerProfilePage() {
   const params = useParams();
+  const router = useRouter();
   const id = useMemo(() => {
     const raw = (params as any)?.id;
     const s = Array.isArray(raw) ? raw[0] : raw;
@@ -85,7 +86,7 @@ export default function OrganizerProfilePage() {
 
   if (!id) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm">
+      <div className="ui-card p-6 text-sm">
         Invalid organizer id
       </div>
     );
@@ -93,7 +94,7 @@ export default function OrganizerProfilePage() {
 
   if (loading) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm text-(--subtext)">
+      <div className="ui-card p-6 text-sm text-(--subtext)">
         Loading organizer…
       </div>
     );
@@ -117,7 +118,7 @@ export default function OrganizerProfilePage() {
 
   if (!data) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6 text-sm">
+      <div className="ui-card p-6 text-sm">
         Organizer not found
       </div>
     );
@@ -128,7 +129,7 @@ export default function OrganizerProfilePage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-6">
+      <div className="ui-card p-6">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="h-12 w-12 rounded-2xl bg-white/10 overflow-hidden flex items-center justify-center">
@@ -162,17 +163,17 @@ export default function OrganizerProfilePage() {
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="ui-panel p-4">
             <div className="text-xs text-(--subtext)">Avg Rating</div>
             <div className="mt-1 text-xl font-semibold">
               {summary.avgRating === null ? "-" : summary.avgRating.toFixed(1)}
             </div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="ui-panel p-4">
             <div className="text-xs text-(--subtext)">Total Reviews</div>
             <div className="mt-1 text-xl font-semibold">{summary.totalReviews}</div>
           </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="ui-panel p-4">
             <div className="text-xs text-(--subtext)">Role</div>
             <div className="mt-1 text-xl font-semibold">{organizer.role}</div>
           </div>
@@ -180,7 +181,7 @@ export default function OrganizerProfilePage() {
       </div>
 
       {/* Events */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+      <div className="ui-card overflow-hidden">
         <div className="px-6 py-4 border-b border-white/10">
           <div className="text-lg font-semibold">Events by {organizer.name}</div>
           <div className="text-sm text-(--subtext)">
@@ -193,9 +194,14 @@ export default function OrganizerProfilePage() {
         ) : (
           <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-3">
             {events.map((event) => (
-              <Link
+              <div
                 key={event.id}
-                href={`/events/${event.id}`}
+                role="button"
+                tabIndex={0}
+                onClick={() => router.push(`/events/${event.id}`)}
+                onKeyDown={(ev) => {
+                  if (ev.key === "Enter") router.push(`/events/${event.id}`);
+                }}
                 className="group rounded-2xl border border-white/10 bg-white/5 overflow-hidden transition hover:border-white/20"
               >
                 {event.imageUrl ? (
@@ -214,7 +220,14 @@ export default function OrganizerProfilePage() {
                 <div className="p-4 space-y-2">
                   <div className="font-semibold">{event.name}</div>
                   <div className="text-xs text-(--subtext)">
-                    {event.category} • {event.location}
+                    <Link
+                      href={`/?category=${encodeURIComponent(event.category)}`}
+                      className="text-white/80 hover:text-white hover:underline"
+                      onClick={(ev) => ev.stopPropagation()}
+                    >
+                      {event.category}
+                    </Link>{" "}
+                    • {event.location}
                   </div>
                   <div className="text-xs text-(--subtext)">
                     {formatDateShort(event.startAt)}
@@ -231,14 +244,14 @@ export default function OrganizerProfilePage() {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
       </div>
 
       {/* Reviews */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+      <div className="ui-card overflow-hidden">
         <div className="px-6 py-4 border-b border-white/10">
           <div className="text-lg font-semibold">Reviews</div>
           <div className="text-sm text-(--subtext)">

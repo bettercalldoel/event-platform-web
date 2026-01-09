@@ -314,7 +314,7 @@ export default function OrganizerPage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+      <div className="ui-card p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-xl font-semibold">Dashboard</div>
@@ -368,7 +368,7 @@ export default function OrganizerPage() {
             </TabButton>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+          <div className="ui-card overflow-hidden">
             {visibleTrx.length === 0 ? (
               <div className="p-6 text-sm text-(--subtext)">Tidak ada transaksi di tab ini.</div>
             ) : (
@@ -454,7 +454,7 @@ export default function OrganizerPage() {
       {/* EVENTS */}
       {mainTab === "events" && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+          <div className="ui-card p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold">My Events</div>
@@ -492,7 +492,7 @@ export default function OrganizerPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+          <div className="ui-card overflow-hidden">
             {visibleEvents.length === 0 ? (
               <div className="p-6 text-sm text-(--subtext)">Belum ada event.</div>
             ) : (
@@ -523,8 +523,18 @@ export default function OrganizerPage() {
                         <div>
                           <div className="font-semibold">{e.name}</div>
                           <div className="text-xs text-(--subtext)">
-                            {e.category ?? "-"} • {e.location ?? "-"} •{" "}
-                            {e.isPublished ? "Published" : "Hidden"} • Seats {e.remainingSeats}/{e.totalSeats}
+                            {e.category ? (
+                              <Link
+                                href={`/?category=${encodeURIComponent(e.category)}`}
+                                className="text-white/80 hover:text-white hover:underline"
+                              >
+                                {e.category}
+                              </Link>
+                            ) : (
+                              "-"
+                            )}{" "}
+                            • {e.location ?? "-"} • {e.isPublished ? "Published" : "Hidden"} • Seats{" "}
+                            {e.remainingSeats}/{e.totalSeats}
                           </div>
                         </div>
                       </div>
@@ -537,7 +547,13 @@ export default function OrganizerPage() {
 
                     <div className="col-span-2">{e.price === 0 ? "Free" : formatIDR(e.price)}</div>
 
-                    <div className="col-span-2 flex justify-end gap-2">
+                    <div className="col-span-2 flex flex-wrap justify-end gap-2">
+                      <Link
+                        href={`/organizer/events/${e.id}/edit`}
+                        className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
+                      >
+                        Edit
+                      </Link>
                       <Link
                         href={`/organizer/events/${e.id}/vouchers`}
                         className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
@@ -562,7 +578,7 @@ export default function OrganizerPage() {
       {/* STATS */}
       {mainTab === "stats" && (
         <div className="space-y-3">
-          <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+          <div className="ui-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">Statistics</div>
@@ -601,21 +617,21 @@ export default function OrganizerPage() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+            <div className="ui-card p-5">
               <div className="text-xs text-(--subtext)">Events with sales</div>
               <div className="mt-1 text-2xl font-semibold">{statsSummary.totalEvents}</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+            <div className="ui-card p-5">
               <div className="text-xs text-(--subtext)">Tickets sold</div>
               <div className="mt-1 text-2xl font-semibold">{ticketsSold}</div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+            <div className="ui-card p-5">
               <div className="text-xs text-(--subtext)">Tickets available</div>
               <div className="mt-1 text-2xl font-semibold">
                 {ticketSummary.remainingSeats}
               </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-(--surface) p-5">
+            <div className="ui-card p-5">
               <div className="text-xs text-(--subtext)">Total revenue</div>
               <div className="mt-1 text-2xl font-semibold">
                 {formatIDR(statsSummary.totalRevenue)}
@@ -623,7 +639,7 @@ export default function OrganizerPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+          <div className="ui-card overflow-hidden">
             <div className="grid grid-cols-12 gap-2 px-4 py-3 text-xs text-(--subtext) border-b border-white/10">
               <div className="col-span-3">Period</div>
               <div className="col-span-5">Event</div>
@@ -657,7 +673,7 @@ export default function OrganizerPage() {
       {/* ATTENDEES MODAL */}
       {attOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-3xl rounded-2xl border border-white/10 bg-(--surface) overflow-hidden">
+          <div className="w-full max-w-3xl ui-card overflow-hidden">
             <div className="px-5 py-4 border-b border-white/10 flex items-start justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">Attendees</div>
@@ -690,15 +706,15 @@ export default function OrganizerPage() {
               ) : (
                 <div className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="ui-panel p-3">
                       <div className="text-xs text-(--subtext)">Total Attendees (rows)</div>
                       <div className="mt-1 text-xl font-semibold">{attData.summary.totalAttendees}</div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="ui-panel p-3">
                       <div className="text-xs text-(--subtext)">Total Tickets</div>
                       <div className="mt-1 text-xl font-semibold">{attData.summary.totalTickets}</div>
                     </div>
-                    <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="ui-panel p-3">
                       <div className="text-xs text-(--subtext)">Total Revenue</div>
                       <div className="mt-1 text-xl font-semibold">{formatIDR(attData.summary.totalRevenue)}</div>
                     </div>

@@ -27,7 +27,7 @@ export function ConfirmDialog({
       {trigger(open)}
       <dialog
         ref={ref}
-        className="rounded-2xl p-0 w-[92vw] max-w-md bg-[var(--surface)] text-white border border-white/10"
+        className="rounded-2xl p-0 w-[92vw] max-w-md bg-[var(--surface)] text-white border border-white/10 shadow-[0_20px_50px_-30px_rgba(2,6,23,0.9)]"
       >
         <div className="p-5">
           <div className="text-lg font-semibold">{title}</div>
