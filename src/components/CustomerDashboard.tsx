@@ -12,6 +12,7 @@ type Trx = {
   qty: number;
   totalAmount: number;
   paymentDueAt: string;
+  paymentRemainingSeconds?: number | null;
   paymentProofUrl?: string | null;
   event: { id: number; name: string; startAt?: string; location?: string; imageUrl?: string | null };
 };
@@ -52,6 +53,17 @@ function formatDateShort(dateISO: string) {
   });
 }
 
+function formatCountdown(seconds: number) {
+  const safe = Math.max(0, Math.floor(seconds));
+  const mm = Math.floor(safe / 60)
+    .toString()
+    .padStart(2, "0");
+  const ss = Math.floor(safe % 60)
+    .toString()
+    .padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
 function TabButton({
   active,
   children,
@@ -82,6 +94,7 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
   const [tab, setTab] = useState<TabKey>(initialTab);
   const [items, setItems] = useState<Trx[]>([]);
   const [err, setErr] = useState<string | null>(null);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
 
   const [attended, setAttended] = useState<AttendedEvent[]>([]);
   const [attErr, setAttErr] = useState<string | null>(null);
@@ -184,6 +197,11 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user, token]);
 
+  useEffect(() => {
+    const id = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   const openFilePicker = (trxId: number) => {
     setActivePickId(trxId);
     fileInputRef.current?.click();
@@ -214,6 +232,11 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
     }
     if (trx.status !== "WAITING_FOR_PAYMENT") {
       setErr("Transaksi ini tidak sedang menunggu pembayaran.");
+      return;
+    }
+    const dueAt = new Date(trx.paymentDueAt).getTime();
+    if (!Number.isNaN(dueAt) && Date.now() > dueAt) {
+      setErr("Waktu pembayaran sudah habis. Transaksi akan kadaluarsa.");
       return;
     }
 
@@ -445,6 +468,16 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
             <div className="grid gap-3">
               {items.map((t) => (
                 <div key={t.id} className="ui-card p-5">
+                  {(() => {
+                    const dueMs = new Date(t.paymentDueAt).getTime();
+                    const remainingSeconds =
+                      t.status === "WAITING_FOR_PAYMENT" && !Number.isNaN(dueMs)
+                        ? Math.max(0, Math.floor((dueMs - nowTs) / 1000))
+                        : null;
+                    const isExpired = remainingSeconds !== null && remainingSeconds <= 0;
+                    const canUpload = t.status === "WAITING_FOR_PAYMENT" && !isExpired;
+
+                    return (
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold">{t.event.name}</div>
@@ -455,6 +488,17 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
                       <div className="text-xs text-(--subtext) mt-1">
                         Status: <span className="text-white">{t.status}</span>
                       </div>
+                      {remainingSeconds !== null && (
+                        <div
+                          className={`text-xs mt-1 ${
+                            isExpired ? "text-(--accent)" : "text-(--primary)"
+                          }`}
+                        >
+                          {isExpired
+                            ? "Waktu pembayaran habis"
+                            : `Sisa waktu bayar: ${formatCountdown(remainingSeconds)}`}
+                        </div>
+                      )}
                     </div>
 
                     <div className="text-right">
@@ -470,13 +514,20 @@ export default function CustomerDashboard({ initialTab = "transactions" }: { ini
                       ) : (
                         <button
                           onClick={() => openFilePicker(t.id)}
-                          className="inline-flex px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-sm"
+                          disabled={!canUpload}
+                          className={`inline-flex px-3 py-2 rounded-xl border text-sm ${
+                            !canUpload
+                              ? "bg-white/5 border-white/10 text-(--subtext) cursor-not-allowed"
+                              : "bg-white/5 hover:bg-white/10 border-white/10"
+                          }`}
                         >
-                          Upload Proof
+                          {isExpired ? "Expired" : "Upload Proof"}
                         </button>
                       )}
                     </div>
                   </div>
+                    );
+                  })()}
 
                   {previewById[t.id] && (
                     <div className="mt-4 flex flex-wrap items-center gap-3">
