@@ -23,7 +23,7 @@ export default function OrganizerCreateEventPage() {
   const { user, token, loading } = useAuth();
 
   const [name, setName] = useState("");
-  const [category, setCategory] = useState(EVENT_CATEGORIES[0]);
+  const [category, setCategory] = useState<string>(EVENT_CATEGORIES[0]);
   const [location, setLocation] = useState("Jakarta");
   const [description, setDescription] = useState("");
   const [startAt, setStartAt] = useState(""); // datetime-local

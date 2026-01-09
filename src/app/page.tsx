@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, Suspense, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, formatIDR } from "@/lib/api";
 import { EVENT_CATEGORIES } from "@/lib/constants";
@@ -34,6 +34,18 @@ function useDebounce<T>(value: T, delay = 400) {
 }
 
 export default function HomePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="ui-card p-6 text-sm text-(--subtext)">Loading…</div>
+      }
+    >
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchKey = useMemo(() => searchParams.toString(), [searchParams]);
